@@ -120,6 +120,7 @@ body {
     flex-shrink: 0;
 }
 
+/* 标签页切换样式 */
 .library-header {
     padding: 12px 16px;
     background: #ffffff;
@@ -127,23 +128,53 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
 }
 
-.library-header h3 {
-    color: #1e4a76;
-    font-size: 14px;
+.library-tabs {
+    display: flex;
+    gap: 4px;
+    background: #e2e8f0;
+    padding: 3px;
+    border-radius: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.tab-btn {
+    padding: 6px 14px;
+    font-size: 12px;
     font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.tab-btn.active {
+    background: #1e4a76;
+    color: white;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.tab-btn:not(.active):hover {
+    background: #cbd5e1;
+    color: #1e293b;
 }
 
 .icon-btn {
     background: #eef2ff;
     border: none;
     color: #1e4a76;
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
+    flex-shrink: 0;
 }
 
 .icon-btn:hover {
@@ -202,7 +233,6 @@ body {
     box-shadow: 0 4px 12px -8px rgba(0,0,0,0.15);
 }
 
-/* 图标区域 */
 .card-icons-area {
     flex: 1;
     padding: 12px 8px;
@@ -219,7 +249,6 @@ body {
 .card-icons-grid[data-columns="5"] { grid-template-columns: repeat(5, minmax(50px, 60px)); }
 .card-icons-grid[data-columns="6"] { grid-template-columns: repeat(6, minmax(45px, 55px)); }
 
-/* 图标项 - 可拖拽 */
 .card-icon-item {
     text-align: center;
     cursor: grab;
@@ -241,7 +270,6 @@ body {
     cursor: grabbing;
 }
 
-/* 雪碧图图标 - 24x24 */
 .card-icon-sprite {
     width: 24px;
     height: 24px;
@@ -265,7 +293,6 @@ body {
     padding: 0 2px;
 }
 
-/* 分类标题 */
 .category-title {
     background: #1e293b;
     padding: 10px 8px;
@@ -417,7 +444,6 @@ body {
     color: white;
 }
 
-/* 颜色选择器 */
 .color-picker {
     display: flex;
     gap: 10px;
@@ -443,7 +469,6 @@ body {
     border-color: #1e4a76;
 }
 
-/* 滚动条 */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -462,10 +487,33 @@ body {
     background: #64748b;
 }
 
-/* 主内容区域 */
 .main-content {
     display: flex;
     flex: 1;
     overflow: hidden;
     min-height: 0;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .component-library {
+        width: 280px;
+    }
+    
+    .tab-btn {
+        padding: 4px 10px;
+        font-size: 11px;
+    }
+    
+    .tool-btn span, .tool-btn-small span {
+        display: none;
+    }
+    
+    .tool-btn i, .tool-btn-small i {
+        margin-right: 0;
+    }
+    
+    .tool-btn, .tool-btn-small {
+        padding: 6px 10px;
+    }
 }
