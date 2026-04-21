@@ -1,141 +1,207 @@
-// 主程序
+// 主程序 - 多菜单架构
 let canvasManager;
 let dragData = null;
 let lang = 'cn';
-let componentsData = {};
-let groupsList = [];
-let detailsCache = new Map(); // 缓存已加载的详情
+let activeMenuId = 'kangaroo'; // 当前激活的菜单ID
+
+// 菜单配置 - 在这里添加新菜单
+const MENU_CONFIG = {
+    kangaroo: {
+        name: 'Kangaroo2',
+        nameCn: '🦘 Kangaroo2',
+        nameEn: '🦘 Kangaroo2',
+        icon: 'fa-puzzle-piece',
+        dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json',
+        groupOrder: ['Goals-6dof', 'Goals-Angle', 'Goals-Co', 'Goals-Col', 'Goals-Lin',
+                     'Goals-Mesh', 'Goals-On', 'Goals-Pt', 'Main', 'Mesh'],
+        groupNames: {
+            'Goals-6dof': '六自由度约束',
+            'Goals-Angle': '角度约束',
+            'Goals-Co': '重合/共线/共面',
+            'Goals-Col': '碰撞约束',
+            'Goals-Lin': '长度/弹簧约束',
+            'Goals-Mesh': '网格曲面约束',
+            'Goals-On': '在几何体上',
+            'Goals-Pt': '点/锚点约束',
+            'Main': '求解器与核心',
+            'Mesh': '网格工具'
+        },
+        groupNamesEn: {
+            'Goals-6dof': '6-DOF Constraints',
+            'Goals-Angle': 'Angle Constraints',
+            'Goals-Co': 'Coincident/Collinear/Coplanar',
+            'Goals-Col': 'Collision Constraints',
+            'Goals-Lin': 'Length/Spring Constraints',
+            'Goals-Mesh': 'Mesh/Surface Constraints',
+            'Goals-On': 'On Geometry',
+            'Goals-Pt': 'Point/Anchor Constraints',
+            'Main': 'Solver & Core',
+            'Mesh': 'Mesh Tools'
+        }
+    },
+    utility: {
+        name: 'Utility',
+        nameCn: '🔧 工具',
+        nameEn: '🔧 Utility',
+        icon: 'fa-tools',
+        dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/utility.json',
+        groupOrder: ['Utility'],
+        groupNames: {
+            'Utility': '工具/实用'
+        },
+        groupNamesEn: {
+            'Utility': 'Utility'
+        }
+    }
+    // ========== 添加新菜单示例 ==========
+    // mesh: {
+    //     name: 'Mesh',
+    //     nameCn: '🔷 网格',
+    //     nameEn: '🔷 Mesh',
+    //     icon: 'fa-cube',
+    //     dataUrl: 'https://.../data/mesh.json',
+    //     groupOrder: ['MeshTools', 'SubD'],
+    //     groupNames: {
+    //         'MeshTools': '网格工具',
+    //         'SubD': '细分曲面'
+    //     },
+    //     groupNamesEn: {
+    //         'MeshTools': 'Mesh Tools',
+    //         'SubD': 'Subdivision'
+    //     }
+    // },
+    // curve: {
+    //     name: 'Curve',
+    //     nameCn: '📈 曲线',
+    //     nameEn: '📈 Curve',
+    //     icon: 'fa-chart-line',
+    //     dataUrl: 'https://.../data/curve.json',
+    //     groupOrder: ['CurveTools', 'Analysis'],
+    //     groupNames: {
+    //         'CurveTools': '曲线工具',
+    //         'Analysis': '曲线分析'
+    //     },
+    //     groupNamesEn: {
+    //         'CurveTools': 'Curve Tools',
+    //         'Analysis': 'Analysis'
+    //     }
+    // }
+};
+
+let menuData = {};      // 存储各菜单的原始数据
+let currentData = {};   // 当前显示的数据
+let currentGroupOrder = [];
+let currentGroupNames = {};
+let currentGroupNamesEn = {};
 
 window.dragData = dragData;
 
-// JSON 文件路径
-const INDEX_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json';
-const DETAILS_BASE_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/';
-
-const GROUP_ORDER = [
-    'Goals-6dof', 'Goals-Angle', 'Goals-Co', 'Goals-Col', 'Goals-Lin',
-    'Goals-Mesh', 'Goals-On', 'Goals-Pt', 'Main', 'Mesh', 'Utility'
-];
-
-const groupDisplayNames = {
-    'Goals-6dof': '六自由度约束',
-    'Goals-Angle': '角度约束',
-    'Goals-Co': '重合/共线/共面',
-    'Goals-Col': '碰撞约束',
-    'Goals-Lin': '长度/弹簧约束',
-    'Goals-Mesh': '网格曲面约束',
-    'Goals-On': '在几何体上',
-    'Goals-Pt': '点/锚点约束',
-    'Main': '求解器与核心',
-    'Mesh': '网格工具',
-    'Utility': '实用工具'
-};
-
-const groupDisplayNamesEn = {
-    'Goals-6dof': '6-DOF Constraints',
-    'Goals-Angle': 'Angle Constraints',
-    'Goals-Co': 'Coincident/Collinear/Coplanar',
-    'Goals-Col': 'Collision Constraints',
-    'Goals-Lin': 'Length/Spring Constraints',
-    'Goals-Mesh': 'Mesh/Surface Constraints',
-    'Goals-On': 'On Geometry',
-    'Goals-Pt': 'Point/Anchor Constraints',
-    'Main': 'Solver & Core',
-    'Mesh': 'Mesh Tools',
-    'Utility': 'Utilities'
-};
-
-// 从 details JSON 文件中提取输入端口名称
-async function loadComponentDetails(componentName) {
-    // 检查缓存
-    if (detailsCache.has(componentName)) {
-        return detailsCache.get(componentName);
-    }
-    
-    try {
-        const url = `${DETAILS_BASE_URL}${componentName}.json?t=${Date.now()}`;
-        console.log(`📥 加载详情: ${url}`);
-        
-        const response = await fetch(url);
-        if (!response.ok) {
-            console.warn(`⚠️ 无法加载 ${componentName}.json`);
-            return { inputs: [], outputs: [] };
-        }
-        
-        const detail = await response.json();
-        
-        // 提取输入端口名称
-        const inputs = [];
-        if (detail.parameters && Array.isArray(detail.parameters)) {
-            detail.parameters.forEach(p => {
-                if (p.name) inputs.push(p.name);
-            });
-        }
-        
-        // 提取输出端口名称
-        const outputs = [];
-        if (detail.outputs && Array.isArray(detail.outputs)) {
-            detail.outputs.forEach(o => {
-                if (o.name) outputs.push(o.name);
-            });
-        }
-        
-        const result = { inputs, outputs };
-        detailsCache.set(componentName, result);
-        
-        console.log(`✅ 加载 ${componentName} 完成: 输入${inputs.length}, 输出${outputs.length}`);
-        return result;
-    } catch (err) {
-        console.error(`❌ 加载 ${componentName} 失败:`, err);
-        return { inputs: [], outputs: [] };
-    }
-}
-
-// 从索引数据中提取端口（如果索引中有的话）
-function extractInputsFromIndex(item) {
+// 提取输入端口名称
+function extractInputs(item) {
+    if (!item) return [];
     if (item.parameters && Array.isArray(item.parameters)) {
         return item.parameters.map(p => p.name || p);
     }
     if (item.inputs && Array.isArray(item.inputs)) {
         return item.inputs;
     }
-    return null; // 返回 null 表示需要从 details 加载
+    return [];
 }
 
-function extractOutputsFromIndex(item) {
+function extractOutputs(item) {
+    if (!item) return [];
     if (item.outputs && Array.isArray(item.outputs)) {
         return item.outputs.map(o => o.name || o);
     }
-    return null; // 返回 null 表示需要从 details 加载
+    return [];
 }
 
-function loadComponentsData() {
-    const container = document.getElementById('categoriesContainer');
-    if (!container) return;
+// 加载单个菜单数据
+function loadMenuData(menuId) {
+    const config = MENU_CONFIG[menuId];
+    if (!config) return Promise.reject(`菜单 ${menuId} 不存在`);
     
-    container.innerHTML = '<div style="color: #888; text-align: center; padding: 40px;"><i class="fas fa-spinner fa-pulse"></i> 加载组件数据中...</div>';
-    
-    fetch(INDEX_URL + '?t=' + Date.now())
+    console.log(`📡 加载 ${menuId} 数据:`, config.dataUrl);
+    return fetch(config.dataUrl + '?t=' + Date.now())
         .then(res => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
         })
         .then(data => {
-            console.log('✅ 索引数据加载成功');
-            componentsData = data;
-            
-            groupsList = GROUP_ORDER.filter(group => 
-                componentsData[group] && componentsData[group].length > 0
-            );
-            
-            renderCategories();
+            console.log(`✅ ${menuId} 数据加载成功`);
+            menuData[menuId] = data;
+            return true;
         })
         .catch(err => {
-            console.error('❌ 数据加载失败:', err);
-            container.innerHTML = `<div style="color:#dc2626;text-align:center;padding:40px;">
-                <i class="fas fa-exclamation-triangle"></i> 数据加载失败: ${err.message}
-            </div>`;
+            console.error(`❌ ${menuId} 数据加载失败:`, err);
+            menuData[menuId] = {};
+            return false;
         });
+}
+
+// 加载所有菜单数据
+function loadAllMenusData() {
+    const container = document.getElementById('categoriesContainer');
+    if (container) {
+        container.innerHTML = '<div style="color: #888; text-align: center; padding: 40px;"><i class="fas fa-spinner fa-pulse"></i> 加载组件数据中...</div>';
+    }
+    
+    const promises = Object.keys(MENU_CONFIG).map(menuId => loadMenuData(menuId));
+    
+    Promise.all(promises)
+        .then(() => {
+            renderMenuTabs();
+            switchMenu(activeMenuId);
+        })
+        .catch(err => {
+            console.error('数据加载出错:', err);
+            if (container) {
+                container.innerHTML = `<div style="color:#dc2626;text-align:center;padding:40px;">
+                    <i class="fas fa-exclamation-triangle"></i> 数据加载失败
+                </div>`;
+            }
+        });
+}
+
+// 渲染菜单标签页
+function renderMenuTabs() {
+    const tabsContainer = document.getElementById('libraryTabs');
+    if (!tabsContainer) return;
+    
+    tabsContainer.innerHTML = '';
+    
+    Object.keys(MENU_CONFIG).forEach(menuId => {
+        const config = MENU_CONFIG[menuId];
+        const displayName = lang === 'cn' ? config.nameCn : config.nameEn;
+        
+        const btn = document.createElement('button');
+        btn.className = `tab-btn ${menuId === activeMenuId ? 'active' : ''}`;
+        btn.setAttribute('data-menu', menuId);
+        btn.innerHTML = `<i class="fas ${config.icon}"></i> ${displayName}`;
+        btn.addEventListener('click', () => switchMenu(menuId));
+        tabsContainer.appendChild(btn);
+    });
+}
+
+// 切换菜单
+function switchMenu(menuId) {
+    const config = MENU_CONFIG[menuId];
+    if (!config) return;
+    
+    activeMenuId = menuId;
+    currentData = menuData[menuId] || {};
+    currentGroupOrder = config.groupOrder.filter(group => 
+        currentData[group] && currentData[group].length > 0
+    );
+    currentGroupNames = config.groupNames;
+    currentGroupNamesEn = config.groupNamesEn;
+    
+    // 更新标签页样式
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-menu') === menuId);
+    });
+    
+    renderCategories();
 }
 
 function renderCategories() {
@@ -146,8 +212,8 @@ function renderCategories() {
     const grid = document.createElement('div');
     grid.className = 'categories-grid';
     
-    groupsList.forEach(groupKey => {
-        const items = componentsData[groupKey];
+    currentGroupOrder.forEach(groupKey => {
+        const items = currentData[groupKey];
         if (!items || items.length === 0) return;
         
         const itemCount = items.length;
@@ -185,7 +251,7 @@ function renderCategories() {
         const titleArea = document.createElement('div');
         titleArea.className = 'category-title';
         const titleSpan = document.createElement('span');
-        const displayName = lang === 'cn' ? groupDisplayNames[groupKey] : groupDisplayNamesEn[groupKey];
+        const displayName = lang === 'cn' ? currentGroupNames[groupKey] : currentGroupNamesEn[groupKey];
         titleSpan.textContent = displayName || groupKey;
         titleArea.appendChild(titleSpan);
         
@@ -195,6 +261,7 @@ function renderCategories() {
     });
     
     container.appendChild(grid);
+    console.log(`✅ 已渲染 ${currentGroupOrder.length} 个分类卡片 (${activeMenuId})`);
 }
 
 function createIconItem(item) {
@@ -205,24 +272,14 @@ function createIconItem(item) {
     const displayName = lang === 'cn' ? (item.cn || item.name) : (item.en || item.name);
     iconItem.title = displayName;
     
-    // 存储组件基本信息
+    const inputs = extractInputs(item);
+    const outputs = extractOutputs(item);
+    
     iconItem.dataset.componentName = item.name;
+    iconItem.dataset.componentInputs = JSON.stringify(inputs);
+    iconItem.dataset.componentOutputs = JSON.stringify(outputs);
     iconItem.dataset.spriteX = item.spriteX || 0;
     iconItem.dataset.spriteY = item.spriteY || 0;
-    
-    // 尝试从索引中读取端口
-    let indexInputs = extractInputsFromIndex(item);
-    let indexOutputs = extractOutputsFromIndex(item);
-    
-    // 如果索引中有端口数据，直接存储
-    if (indexInputs !== null && indexOutputs !== null) {
-        iconItem.dataset.componentInputs = JSON.stringify(indexInputs);
-        iconItem.dataset.componentOutputs = JSON.stringify(indexOutputs);
-        iconItem.dataset.detailsLoaded = 'true';
-    } else {
-        // 标记需要从 details 加载
-        iconItem.dataset.detailsLoaded = 'false';
-    }
     
     const sprite = document.createElement('div');
     sprite.className = 'card-icon-sprite';
@@ -240,46 +297,20 @@ function createIconItem(item) {
     iconItem.appendChild(sprite);
     iconItem.appendChild(nameSpan);
     
-    // 拖拽开始 - 异步加载详情
-    iconItem.addEventListener('dragstart', async (e) => {
-        e.dataTransfer.setData('text/plain', JSON.stringify({ name: item.name }));
-        e.dataTransfer.effectAllowed = 'copy';
-        iconItem.style.opacity = '0.5';
-        
-        console.log(`🚀 拖拽开始: ${item.name}`);
-        
-        // 如果需要从 details 加载
-        let inputs = [];
-        let outputs = [];
-        
-        if (iconItem.dataset.detailsLoaded === 'false') {
-            console.log(`📥 正在加载 ${item.name} 的端口详情...`);
-            const details = await loadComponentDetails(item.name);
-            inputs = details.inputs;
-            outputs = details.outputs;
-            
-            // 缓存到 dataset
-            iconItem.dataset.componentInputs = JSON.stringify(inputs);
-            iconItem.dataset.componentOutputs = JSON.stringify(outputs);
-            iconItem.dataset.detailsLoaded = 'true';
-        } else {
-            inputs = JSON.parse(iconItem.dataset.componentInputs || '[]');
-            outputs = JSON.parse(iconItem.dataset.componentOutputs || '[]');
-        }
-        
+    iconItem.addEventListener('dragstart', (e) => {
         const componentData = {
             name: item.name,
             inputs: inputs,
             outputs: outputs,
-            spriteX: parseInt(iconItem.dataset.spriteX) || 0,
-            spriteY: parseInt(iconItem.dataset.spriteY) || 0
+            spriteX: item.spriteX || 0,
+            spriteY: item.spriteY || 0
         };
-        
         dragData = componentData;
         window.dragData = componentData;
-        
-        console.log(`   输入端口:`, componentData.inputs);
-        console.log(`   输出端口:`, componentData.outputs);
+        e.dataTransfer.setData('text/plain', JSON.stringify(componentData));
+        e.dataTransfer.effectAllowed = 'copy';
+        iconItem.style.opacity = '0.5';
+        console.log(`🚀 拖拽: ${componentData.name}, 输入:${inputs.length}, 输出:${outputs.length}`);
     });
     
     iconItem.addEventListener('dragend', (e) => {
@@ -300,39 +331,18 @@ function setupCanvasDrop() {
         e.dataTransfer.dropEffect = 'copy';
     });
     
-    canvasContainer.addEventListener('drop', async (e) => {
+    canvasContainer.addEventListener('drop', (e) => {
         e.preventDefault();
         
         let componentData = null;
         
-        // 从全局变量获取
-        if (window.dragData) {
-            componentData = window.dragData;
-        }
-        if (!componentData && dragData) {
-            componentData = dragData;
-        }
+        try {
+            const jsonData = e.dataTransfer.getData('text/plain');
+            if (jsonData) componentData = JSON.parse(jsonData);
+        } catch (err) {}
         
-        // 尝试从 dataTransfer 获取
-        if (!componentData) {
-            try {
-                const jsonData = e.dataTransfer.getData('text/plain');
-                if (jsonData) {
-                    const parsed = JSON.parse(jsonData);
-                    if (parsed.name) {
-                        // 需要重新加载详情
-                        const details = await loadComponentDetails(parsed.name);
-                        componentData = {
-                            name: parsed.name,
-                            inputs: details.inputs,
-                            outputs: details.outputs,
-                            spriteX: 0,
-                            spriteY: 0
-                        };
-                    }
-                }
-            } catch (err) {}
-        }
+        if (!componentData && window.dragData) componentData = window.dragData;
+        if (!componentData && dragData) componentData = dragData;
         
         if (!componentData) {
             console.warn('❌ 没有拖拽数据');
@@ -340,8 +350,6 @@ function setupCanvasDrop() {
         }
         
         console.log(`📍 放置电池: ${componentData.name}`);
-        console.log(`   输入端口:`, componentData.inputs);
-        console.log(`   输出端口:`, componentData.outputs);
         
         const rect = document.getElementById('canvas').getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
@@ -353,13 +361,11 @@ function setupCanvasDrop() {
         const newComponent = new Component(
             generateId(),
             componentData.name,
-            canvasX - 75,
-            canvasY - 35,
+            canvasX - 80,
+            canvasY - 40,
             componentData.inputs || [],
             componentData.outputs || []
         );
-        
-        console.log(`🔋 创建电池完成，输入: ${newComponent.inputs.length}, 输出: ${newComponent.outputs.length}`);
         
         newComponent.spriteX = componentData.spriteX;
         newComponent.spriteY = componentData.spriteY;
@@ -370,13 +376,13 @@ function setupCanvasDrop() {
     });
 }
 
-// 其他函数保持不变...
 function setupLanguage() {
     const langBtn = document.getElementById('langBtn');
     if (langBtn) {
         langBtn.addEventListener('click', () => {
             lang = lang === 'cn' ? 'en' : 'cn';
             langBtn.textContent = lang === 'cn' ? 'EN' : '中';
+            renderMenuTabs();
             renderCategories();
         });
     }
@@ -567,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    loadComponentsData();
+    loadAllMenusData();
     setupCanvasDrop();
     setupLanguage();
     setupLibrarySearch();
