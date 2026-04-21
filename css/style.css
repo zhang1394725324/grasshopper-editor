@@ -182,7 +182,7 @@ body {
     align-items: flex-start;
 }
 
-/* 分类卡片 - 固定宽度，高度自适应 */
+/* 分类卡片 */
 .category-card {
     background: #ffffff;
     border: 1px solid #cbd5e1;
@@ -241,9 +241,10 @@ body {
     cursor: grabbing;
 }
 
+/* 雪碧图图标 - 24x24 */
 .card-icon-sprite {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     margin: 0 auto 6px;
     background-image: url('https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png');
     background-repeat: no-repeat;
@@ -461,7 +462,7 @@ body {
     background: #64748b;
 }
 
-/* 主内容区域 - 重要：确保画布可以伸缩 */
+/* 主内容区域 */
 .main-content {
     display: flex;
     flex: 1;
