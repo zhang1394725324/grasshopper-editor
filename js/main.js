@@ -5,11 +5,11 @@ let lang = 'cn';
 let componentsData = {};
 let groupsList = [];
 
+// 挂载到 window 对象，确保全局可访问
+window.dragData = dragData;
+
 // 跨项目引用 JSON 数据（使用 GitHub Raw，已验证可用）
 const JSON_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json';
-
-// 雪碧图 URL（也改用 Raw 链接保持一致）
-const SPRITE_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png';
 
 // 分组配置
 const GROUP_ORDER = [
@@ -151,7 +151,7 @@ function createIconItem(item) {
     const displayName = lang === 'cn' ? (item.cn || item.name) : (item.en || item.name);
     iconItem.title = displayName;
     
-    // 存储组件数据
+    // 存储组件数据到 dataset
     iconItem.dataset.componentName = item.name;
     iconItem.dataset.componentInputs = JSON.stringify(item.inputs || []);
     iconItem.dataset.componentOutputs = JSON.stringify(item.outputs || []);
@@ -176,21 +176,25 @@ function createIconItem(item) {
     
     // 拖拽事件
     iconItem.addEventListener('dragstart', (e) => {
-        dragData = {
+        const componentData = {
             name: item.name,
             inputs: item.inputs || [],
             outputs: item.outputs || [],
             spriteX: item.spriteX || 0,
             spriteY: item.spriteY || 0
         };
-        e.dataTransfer.setData('text/plain', JSON.stringify(dragData));
+        dragData = componentData;
+        window.dragData = componentData;
+        e.dataTransfer.setData('text/plain', JSON.stringify(componentData));
         e.dataTransfer.effectAllowed = 'copy';
         iconItem.style.opacity = '0.5';
+        console.log('拖拽开始:', componentData.name);
     });
     
     iconItem.addEventListener('dragend', (e) => {
         iconItem.style.opacity = '';
         dragData = null;
+        window.dragData = null;
     });
     
     return iconItem;
@@ -209,15 +213,32 @@ function setupCanvasDrop() {
     canvasContainer.addEventListener('drop', (e) => {
         e.preventDefault();
         
-        let componentData = dragData;
-        if (!componentData) {
-            try {
-                const jsonData = e.dataTransfer.getData('text/plain');
-                if (jsonData) componentData = JSON.parse(jsonData);
-            } catch (err) {}
+        let componentData = null;
+        
+        // 尝试从拖拽数据获取
+        try {
+            const jsonData = e.dataTransfer.getData('text/plain');
+            if (jsonData) {
+                componentData = JSON.parse(jsonData);
+            }
+        } catch (err) {
+            console.warn('解析拖拽数据失败:', err);
         }
         
-        if (!componentData) return;
+        // 也检查全局 dragData
+        if (!componentData && window.dragData) {
+            componentData = window.dragData;
+        }
+        if (!componentData && dragData) {
+            componentData = dragData;
+        }
+        
+        if (!componentData) {
+            console.warn('没有拖拽数据');
+            return;
+        }
+        
+        console.log('放置电池:', componentData.name);
         
         const rect = document.getElementById('canvas').getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
@@ -235,7 +256,6 @@ function setupCanvasDrop() {
             componentData.outputs || []
         );
         
-        // 设置图标位置（雪碧图坐标）
         newComponent.spriteX = componentData.spriteX;
         newComponent.spriteY = componentData.spriteY;
         newComponent.color = getComponentColorByName(componentData.name);
@@ -477,6 +497,14 @@ document.addEventListener('DOMContentLoaded', () => {
     setupUndoRedo();
     setupKeyboardShortcuts();
     setupHelpModal();
+    
+    // 预加载雪碧图
+    if (typeof loadSpriteImage === 'function') {
+        loadSpriteImage(() => {
+            console.log('雪碧图已加载，刷新画布');
+            if (canvasManager) canvasManager.draw();
+        });
+    }
     
     console.log('✅ 初始化完成');
 });
