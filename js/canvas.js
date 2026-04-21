@@ -9,7 +9,7 @@ class CanvasManager {
         // 画布状态
         this.components = new Map();
         this.connections = [];
-        this.selectedComponents = new Set(); // 多选支持
+        this.selectedComponents = new Set();
         this.selectedConnection = null;
         this.panOffset = { x: 0, y: 0 };
         this.zoom = 1;
@@ -33,7 +33,6 @@ class CanvasManager {
         this.historyIndex = -1;
         this.maxHistory = 50;
         
-        // 初始化
         this.initEvents();
         this.resize();
         this.animate();
@@ -46,11 +45,9 @@ class CanvasManager {
         this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
         this.canvas.addEventListener('wheel', this.onWheel.bind(this));
         this.canvas.addEventListener('contextmenu', this.onContextMenu.bind(this));
-        
         window.addEventListener('resize', this.resize.bind(this));
     }
     
-    // 历史记录
     saveToHistory(action) {
         if (this.historyIndex < this.history.length - 1) {
             this.history = this.history.slice(0, this.historyIndex + 1);
@@ -74,7 +71,6 @@ class CanvasManager {
             this.history.shift();
         }
         this.historyIndex = this.history.length - 1;
-        
         this.updateUndoRedoButtons();
     }
     
@@ -125,7 +121,6 @@ class CanvasManager {
                 if (toPort) toPort.connectedTo = connection.id;
             }
         }
-        
         this.draw();
     }
     
@@ -200,7 +195,6 @@ class CanvasManager {
     onMouseDown(e) {
         const { x, y } = this.getMousePos(e);
         
-        // 检查是否点击连接线
         const clickedConnection = this.findConnectionAt(x, y);
         if (clickedConnection && e.button === 0) {
             this.selectedConnection = clickedConnection;
@@ -210,7 +204,6 @@ class CanvasManager {
             return;
         }
         
-        // 检查是否点击端口
         const portClick = this.checkPortClick(x, y);
         if (portClick) {
             this.startConnecting(portClick);
@@ -218,7 +211,6 @@ class CanvasManager {
             return;
         }
         
-        // 检查是否点击组件
         const clickedComponent = this.findComponentAt(x, y);
         if (clickedComponent) {
             if (e.shiftKey) {
@@ -247,7 +239,6 @@ class CanvasManager {
             return;
         }
         
-        // 框选
         if (!e.shiftKey) {
             this.selectedComponents.clear();
             this.selectedConnection = null;
@@ -258,7 +249,6 @@ class CanvasManager {
         this.selectStart = { x, y };
         this.selectEnd = { x, y };
         
-        // 平移（中键或右键）
         if (e.button === 1 || e.button === 2) {
             this.isSelecting = false;
             this.isPanning = true;
@@ -287,7 +277,6 @@ class CanvasManager {
             return;
         }
         
-        // 拖动组件
         let dragging = false;
         for (const comp of this.selectedComponents) {
             if (comp.isDragging) {
@@ -302,7 +291,6 @@ class CanvasManager {
             return;
         }
         
-        // 连接中
         if (this.isConnecting) {
             this.currentMousePos = { x, y };
             this.hoverPort = this.checkPortClick(x, y);
@@ -310,7 +298,6 @@ class CanvasManager {
             return;
         }
         
-        // 悬停检测
         const newHoverConnection = this.findConnectionAt(x, y);
         if (newHoverConnection !== this.hoverConnection) {
             this.hoverConnection = newHoverConnection;
@@ -364,7 +351,6 @@ class CanvasManager {
         if (this.selectedComponents.size === 1 && this.onSelectionChange) {
             this.onSelectionChange(Array.from(this.selectedComponents)[0]);
         }
-        
         this.draw();
     }
     
@@ -393,14 +379,12 @@ class CanvasManager {
         e.preventDefault();
         const { x, y } = this.getMousePos(e);
         
-        // 检查连接线右键
         const clickedConnection = this.findConnectionAt(x, y);
         if (clickedConnection) {
             this.showConnectionMenu(e.clientX, e.clientY, clickedConnection);
             return;
         }
         
-        // 检查电池右键
         const clickedComponent = this.findComponentAt(x, y);
         if (clickedComponent) {
             if (!this.selectedComponents.has(clickedComponent)) {
@@ -672,7 +656,6 @@ class CanvasManager {
         this.ctx.strokeStyle = '#3a3a3a';
         this.ctx.lineWidth = 0.5;
         
-        // 绘制竖线
         let firstX = ((startX % gridSize) + gridSize) % gridSize;
         for (let x = firstX; x < width; x += gridSize) {
             this.ctx.beginPath();
@@ -681,7 +664,6 @@ class CanvasManager {
             this.ctx.stroke();
         }
         
-        // 绘制横线
         let firstY = ((startY % gridSize) + gridSize) % gridSize;
         for (let y = firstY; y < height; y += gridSize) {
             this.ctx.beginPath();
@@ -697,7 +679,6 @@ class CanvasManager {
         const isSelected = this.selectedComponents.has(component);
         const borderColor = isSelected ? '#ffaa00' : '#555';
         
-        // 背景
         this.ctx.fillStyle = component.color || '#2d2d2d';
         this.ctx.strokeStyle = borderColor;
         this.ctx.lineWidth = isSelected ? 2.5 : 1.5;
@@ -705,16 +686,16 @@ class CanvasManager {
         this.ctx.fillRect(component.x, component.y, component.width, component.height);
         this.ctx.strokeRect(component.x, component.y, component.width, component.height);
         
-        // 电池名称（顶部）
+        // 电池名称
         this.ctx.fillStyle = '#ffaa00';
         this.ctx.font = 'bold 10px "Segoe UI", monospace';
         this.ctx.fillText(component.name, component.x + 6, component.y + 14);
         
-        // 图标（中间）
+        // 图标 - 24x24
         const iconPos = component.getIconPosition();
         this.drawComponentIcon(component, iconPos.x, iconPos.y, 24);
         
-        // 输入端口（左侧）
+        // 输入端口
         component.inputs.forEach((input) => {
             const pos = component.getPortPosition(input);
             this.drawPort(pos.x, pos.y, '#4caf50', input.connectedTo ? '#8bc34a' : '#4caf50');
@@ -723,7 +704,7 @@ class CanvasManager {
             this.ctx.fillText(input.name, pos.x + 7, pos.y + 3);
         });
         
-        // 输出端口（右侧）
+        // 输出端口
         component.outputs.forEach((output) => {
             const pos = component.getPortPosition(output);
             this.drawPort(pos.x, pos.y, '#ff9800', output.connectedTo ? '#ffc107' : '#ff9800');
@@ -738,7 +719,6 @@ class CanvasManager {
         const iconX = x - size / 2;
         const iconY = y - size / 2;
         
-        // 尝试获取雪碧图
         const spriteImg = typeof getSpriteImage === 'function' ? getSpriteImage() : null;
         
         if (component.spriteX !== null && component.spriteY !== null && spriteImg && spriteImg.complete) {
@@ -754,7 +734,7 @@ class CanvasManager {
             }
         }
         
-        // 降级：绘制默认图标
+        // 降级默认图标
         this.ctx.fillStyle = '#555';
         this.ctx.fillRect(iconX, iconY, size, size);
         this.ctx.fillStyle = '#888';
