@@ -44,10 +44,11 @@ function t(key) {
 
 function setLanguage(lang) {
     currentLanguage = lang;
-    // 更新界面文本
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
-        el.textContent = translations[currentLanguage][key] || key;
+        if (translations[currentLanguage][key]) {
+            el.textContent = translations[currentLanguage][key];
+        }
     });
 }
 
@@ -56,17 +57,21 @@ function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
-// 电池组件类（带图标预留位）
+// 电池组件类（带图标支持）
 class Component {
     constructor(id, name, x, y, inputs = [], outputs = []) {
         this.id = id;
         this.name = name;
         this.x = x;
         this.y = y;
-        this.width = 140;
-        this.height = 70;
-        this.color = '#ffaa00'; // 默认颜色
-        this.icon = null; // 预留图标位置
+        this.width = 150;
+        this.height = 80;
+        this.color = '#2d2d2d'; // 默认颜色
+        this.spriteX = null;     // 雪碧图 X 坐标
+        this.spriteY = null;     // 雪碧图 Y 坐标
+        this.icon = null;        // 预留图标位置（emoji或文字）
+        
+        // 输入端口
         this.inputs = inputs.map((input, idx) => ({
             id: `${id}_input_${idx}`,
             name: input,
@@ -74,6 +79,8 @@ class Component {
             position: 'left',
             connectedTo: null
         }));
+        
+        // 输出端口
         this.outputs = outputs.map((output, idx) => ({
             id: `${id}_output_${idx}`,
             name: output,
@@ -81,12 +88,15 @@ class Component {
             position: 'right',
             connectedTo: null
         }));
+        
+        // 拖拽状态
         this.isDragging = false;
         this.isSelected = false;
         this.dragOffsetX = 0;
         this.dragOffsetY = 0;
     }
 
+    // 添加输入端口
     addInput(name) {
         const newInput = {
             id: `${this.id}_input_${this.inputs.length}`,
@@ -96,9 +106,12 @@ class Component {
             connectedTo: null
         };
         this.inputs.push(newInput);
+        // 重新计算高度（可选）
+        this.updateHeight();
         return newInput;
     }
 
+    // 添加输出端口
     addOutput(name) {
         const newOutput = {
             id: `${this.id}_output_${this.outputs.length}`,
@@ -108,19 +121,24 @@ class Component {
             connectedTo: null
         };
         this.outputs.push(newOutput);
+        this.updateHeight();
         return newOutput;
     }
 
+    // 删除输入端口
     removeInput(index) {
         if (index >= 0 && index < this.inputs.length) {
             this.inputs.splice(index, 1);
+            // 重新索引
             this.inputs.forEach((input, idx) => {
                 input.index = idx;
                 input.id = `${this.id}_input_${idx}`;
             });
+            this.updateHeight();
         }
     }
 
+    // 删除输出端口
     removeOutput(index) {
         if (index >= 0 && index < this.outputs.length) {
             this.outputs.splice(index, 1);
@@ -128,13 +146,22 @@ class Component {
                 output.index = idx;
                 output.id = `${this.id}_output_${idx}`;
             });
+            this.updateHeight();
         }
     }
 
+    // 根据端口数量动态调整高度
+    updateHeight() {
+        const maxPorts = Math.max(this.inputs.length, this.outputs.length);
+        // 基础高度60 + 每个端口增加6px，最小70，最大140
+        this.height = Math.min(140, Math.max(70, 60 + maxPorts * 6));
+    }
+
+    // 获取端口位置
     getPortPosition(port) {
         const totalPorts = port.position === 'left' ? this.inputs.length : this.outputs.length;
-        const portHeight = this.height / (totalPorts + 1);
-        const yOffset = portHeight * (port.index + 1);
+        const portSpacing = (this.height - 20) / (totalPorts + 1);
+        const yOffset = 15 + portSpacing * (port.index + 1);
         
         return {
             x: this.x + (port.position === 'left' ? 0 : this.width),
@@ -146,7 +173,15 @@ class Component {
     getIconPosition() {
         return {
             x: this.x + this.width / 2,
-            y: this.y + 25
+            y: this.y + 28
+        };
+    }
+    
+    // 获取电池名称位置
+    getNamePosition() {
+        return {
+            x: this.x + 8,
+            y: this.y + 16
         };
     }
 }
@@ -172,38 +207,69 @@ class HistoryEntry {
     }
 }
 
-// Kangaroo2 风格预设电池
-const componentTemplates = [
-    { name: 'Kangaroo Solver', inputs: ['Goals', 'Points'], outputs: ['Points', 'Lines'] },
-    { name: 'Points', inputs: ['X', 'Y', 'Z'], outputs: ['Points'] },
-    { name: 'Lines', inputs: ['Start', 'End'], outputs: ['Lines'] },
-    { name: 'Anchor Point', inputs: ['Points', 'Strength'], outputs: ['Goal'] },
-    { name: 'Anchor Line', inputs: ['Line', 'Strength'], outputs: ['Goal'] },
-    { name: 'Length', inputs: ['Line', 'Length', 'Strength'], outputs: ['Goal'] },
-    { name: 'Angle', inputs: ['Line A', 'Line B', 'Angle', 'Strength'], outputs: ['Goal'] },
-    { name: 'On Curve', inputs: ['Point', 'Curve', 'Strength'], outputs: ['Goal'] },
-    { name: 'On Mesh', inputs: ['Point', 'Mesh', 'Strength'], outputs: ['Goal'] },
-    { name: 'Spring', inputs: ['Pt A', 'Pt B', 'Rest', 'Stiff'], outputs: ['Force'] },
-    { name: 'Gravity', inputs: ['Points', 'Dir', 'Strength'], outputs: ['Force'] },
-    { name: 'Wind', inputs: ['Points', 'Dir', 'Strength'], outputs: ['Force'] },
-    { name: 'Repulsion', inputs: ['Points', 'Radius', 'Strength'], outputs: ['Force'] },
-    { name: 'Collide Points', inputs: ['Points', 'Radius'], outputs: ['Goal'] },
-    { name: 'Collide Mesh', inputs: ['Points', 'Mesh'], outputs: ['Goal'] },
-    { name: 'Addition', inputs: ['A', 'B'], outputs: ['Result'] },
-    { name: 'Multiplication', inputs: ['A', 'B'], outputs: ['Result'] },
-    { name: 'Distance', inputs: ['Pt A', 'Pt B'], outputs: ['Dist'] },
-    { name: 'Number Slider', inputs: [], outputs: ['Value'] },
-    { name: 'Boolean Toggle', inputs: [], outputs: ['Bool'] },
-    { name: 'Panel', inputs: ['In'], outputs: ['Out'] },
-    { name: 'List Length', inputs: ['List'], outputs: ['Len'] },
-    { name: 'Dispatch', inputs: ['List', 'Pattern'], outputs: ['A', 'B'] },
-    { name: 'Line', inputs: ['Start', 'End'], outputs: ['Line'] },
-    { name: 'Move', inputs: ['Geo', 'Vector'], outputs: ['Geo'] },
-    { name: 'Display Points', inputs: ['Points', 'Size'], outputs: [] },
-    { name: 'Load', inputs: ['Points', 'Force'], outputs: ['Goal'] },
-    { name: 'Bend', inputs: ['Points', 'Angle'], outputs: ['Goal'] },
-    { name: 'Pressure', inputs: ['Mesh', 'Pressure'], outputs: ['Goal'] }
+// 预设颜色
+const presetColors = [
+    '#2d2d2d',  // 默认灰
+    '#4caf50',  // 绿色
+    '#2196f3',  // 蓝色
+    '#f44336',  // 红色
+    '#9c27b0',  // 紫色
+    '#ff9800',  // 橙色
+    '#00bcd4',  // 青色
+    '#e91e63',  // 粉色
+    '#ffc107',  // 黄色
+    '#607d8b'   // 蓝灰色
 ];
 
-// 预设颜色
-const presetColors = ['#ffaa00', '#4caf50', '#2196f3', '#f44336', '#9c27b0', '#ff9800', '#00bcd4', '#e91e63'];
+// 获取电池类型对应的默认颜色
+function getComponentColorByName(name) {
+    if (name.includes('Solver') || name.includes('solver')) return '#4caf50';
+    if (name.includes('Anchor') || name.includes('anchor')) return '#2196f3';
+    if (name.includes('Spring') || name.includes('spring')) return '#ff9800';
+    if (name.includes('Gravity') || name.includes('gravity')) return '#9c27b0';
+    if (name.includes('Wind') || name.includes('wind')) return '#00bcd4';
+    if (name.includes('Collide') || name.includes('collide')) return '#f44336';
+    if (name.includes('Display') || name.includes('display')) return '#e91e63';
+    if (name.includes('Slider') || name.includes('slider')) return '#ffc107';
+    if (name.includes('List') || name.includes('list')) return '#607d8b';
+    return '#2d2d2d';
+}
+
+// 加载雪碧图（单例模式）
+let spriteImage = null;
+let spriteImageLoaded = false;
+let spriteImageCallbacks = [];
+
+function loadSpriteImage(callback) {
+    if (spriteImageLoaded && spriteImage) {
+        if (callback) callback(spriteImage);
+        return;
+    }
+    
+    if (callback) spriteImageCallbacks.push(callback);
+    
+    if (!spriteImage) {
+        spriteImage = new Image();
+        spriteImage.onload = () => {
+            spriteImageLoaded = true;
+            spriteImageCallbacks.forEach(cb => cb(spriteImage));
+            spriteImageCallbacks = [];
+        };
+        spriteImage.onerror = () => {
+            console.warn('雪碧图加载失败，将使用默认图标');
+            spriteImageLoaded = true;
+            spriteImageCallbacks.forEach(cb => cb(null));
+            spriteImageCallbacks = [];
+        };
+        // 尝试加载雪碧图
+        spriteImage.src = 'img/sprites/kangaroo_icons.png';
+    }
+}
+
+function getSpriteImage() {
+    return spriteImage;
+}
+
+function isSpriteLoaded() {
+    return spriteImageLoaded && spriteImage && spriteImage.complete;
+}
