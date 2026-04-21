@@ -97,12 +97,14 @@ class Component {
         this.x = x;
         this.y = y;
         this.width = 150;
-        this.height = 70;
-        this.color = '#2d2d2d';
+        // 根据端口数量动态计算高度：基础高度70 + 每个端口增加10px间距
+        const maxPorts = Math.max(inputs.length, outputs.length);
+        this.height = Math.min(160, Math.max(80, 70 + maxPorts * 10));
+        this.color = '#3a6ea5'; // 统一蓝色主题
         this.spriteX = null;
         this.spriteY = null;
         
-        // 输入端口 - 确保正确创建
+        // 输入端口
         this.inputs = [];
         if (inputs && Array.isArray(inputs)) {
             this.inputs = inputs.map((input, idx) => ({
@@ -114,7 +116,7 @@ class Component {
             }));
         }
         
-        // 输出端口 - 确保正确创建
+        // 输出端口
         this.outputs = [];
         if (outputs && Array.isArray(outputs)) {
             this.outputs = outputs.map((output, idx) => ({
@@ -131,7 +133,7 @@ class Component {
         this.dragOffsetX = 0;
         this.dragOffsetY = 0;
         
-        console.log(`创建电池: ${name}, 输入: ${inputs.length}, 输出: ${outputs.length}`);
+        console.log(`创建电池: ${name}, 输入: ${inputs.length}, 输出: ${outputs.length}, 高度: ${this.height}`);
     }
 
     addInput(name) {
@@ -143,6 +145,7 @@ class Component {
             connectedTo: null
         };
         this.inputs.push(newInput);
+        this.updateHeight();
         return newInput;
     }
 
@@ -155,12 +158,20 @@ class Component {
             connectedTo: null
         };
         this.outputs.push(newOutput);
+        this.updateHeight();
         return newOutput;
+    }
+
+    updateHeight() {
+        const maxPorts = Math.max(this.inputs.length, this.outputs.length);
+        this.height = Math.min(160, Math.max(80, 70 + maxPorts * 10));
     }
 
     getPortPosition(port) {
         const totalPorts = port.position === 'left' ? this.inputs.length : this.outputs.length;
-        const portSpacing = (this.height - 25) / (totalPorts + 1);
+        // 端口间距加大：使用 height - 30 作为可用空间
+        const availableHeight = this.height - 30;
+        const portSpacing = availableHeight / (totalPorts + 1);
         const yOffset = 18 + portSpacing * (port.index + 1);
         
         return {
@@ -177,8 +188,10 @@ class Component {
     }
     
     getNamePosition() {
+        // 名称居中
+        const textWidth = this.name.length * 6; // 估算宽度
         return {
-            x: this.x + 8,
+            x: this.x + (this.width - Math.min(textWidth, this.width - 10)) / 2,
             y: this.y + 16
         };
     }
@@ -195,20 +208,15 @@ class Connection {
     }
 }
 
-// ========== 预设颜色 ==========
+// ========== 预设颜色（统一使用蓝色）==========
 const presetColors = [
-    '#2d2d2d', '#4caf50', '#2196f3', '#f44336', '#9c27b0',
-    '#ff9800', '#00bcd4', '#e91e63', '#ffc107', '#607d8b'
+    '#3a6ea5',  // 默认蓝色
+    '#4a7eb5',
+    '#5a8ec5',
+    '#2a5e95'
 ];
 
+// 所有电池统一颜色
 function getComponentColorByName(name) {
-    if (!name) return '#2d2d2d';
-    const lowerName = name.toLowerCase();
-    if (lowerName.includes('solver')) return '#4caf50';
-    if (lowerName.includes('anchor')) return '#2196f3';
-    if (lowerName.includes('spring')) return '#ff9800';
-    if (lowerName.includes('gravity')) return '#9c27b0';
-    if (lowerName.includes('wind')) return '#00bcd4';
-    if (lowerName.includes('collide')) return '#f44336';
-    return '#2d2d2d';
+    return '#3a6ea5'; // 统一返回蓝色
 }
