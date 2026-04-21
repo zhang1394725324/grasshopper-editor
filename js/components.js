@@ -44,12 +44,6 @@ function t(key) {
 
 function setLanguage(lang) {
     currentLanguage = lang;
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (translations[currentLanguage][key]) {
-            el.textContent = translations[currentLanguage][key];
-        }
-    });
 }
 
 // 生成唯一ID
@@ -57,7 +51,7 @@ function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
-// ========== 雪碧图配置（跨项目引用）==========
+// ========== 雪碧图配置 ==========
 const SPRITE_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png';
 
 let spriteImage = null;
@@ -79,10 +73,10 @@ function loadSpriteImage(callback) {
             spriteImageLoaded = true;
             spriteImageCallbacks.forEach(cb => cb(spriteImage));
             spriteImageCallbacks = [];
-            console.log('✅ 雪碧图加载成功:', SPRITE_URL);
+            console.log('✅ 雪碧图加载成功');
         };
         spriteImage.onerror = () => {
-            console.warn('⚠️ 雪碧图加载失败，将使用默认图标:', SPRITE_URL);
+            console.warn('⚠️ 雪碧图加载失败，将使用默认图标');
             spriteImageLoaded = true;
             spriteImageCallbacks.forEach(cb => cb(null));
             spriteImageCallbacks = [];
@@ -95,10 +89,6 @@ function getSpriteImage() {
     return spriteImage;
 }
 
-function isSpriteLoaded() {
-    return spriteImageLoaded && spriteImage && spriteImage.complete;
-}
-
 // ========== 电池组件类 ==========
 class Component {
     constructor(id, name, x, y, inputs = [], outputs = []) {
@@ -107,41 +97,43 @@ class Component {
         this.x = x;
         this.y = y;
         this.width = 150;
-        this.height = 80;
-        this.color = '#2d2d2d'; // 默认颜色
-        this.spriteX = null;     // 雪碧图 X 坐标
-        this.spriteY = null;     // 雪碧图 Y 坐标
-        this.icon = null;        // 预留图标位置（emoji或文字）
+        this.height = 70;
+        this.color = '#2d2d2d';
+        this.spriteX = null;
+        this.spriteY = null;
         
-        // 输入端口
-        this.inputs = inputs.map((input, idx) => ({
-            id: `${id}_input_${idx}`,
-            name: input,
-            index: idx,
-            position: 'left',
-            connectedTo: null
-        }));
+        // 输入端口 - 确保正确创建
+        this.inputs = [];
+        if (inputs && Array.isArray(inputs)) {
+            this.inputs = inputs.map((input, idx) => ({
+                id: `${id}_input_${idx}`,
+                name: input,
+                index: idx,
+                position: 'left',
+                connectedTo: null
+            }));
+        }
         
-        // 输出端口
-        this.outputs = outputs.map((output, idx) => ({
-            id: `${id}_output_${idx}`,
-            name: output,
-            index: idx,
-            position: 'right',
-            connectedTo: null
-        }));
+        // 输出端口 - 确保正确创建
+        this.outputs = [];
+        if (outputs && Array.isArray(outputs)) {
+            this.outputs = outputs.map((output, idx) => ({
+                id: `${id}_output_${idx}`,
+                name: output,
+                index: idx,
+                position: 'right',
+                connectedTo: null
+            }));
+        }
         
-        // 拖拽状态
         this.isDragging = false;
         this.isSelected = false;
         this.dragOffsetX = 0;
         this.dragOffsetY = 0;
         
-        // 根据端口数量调整高度
-        this.updateHeight();
+        console.log(`创建电池: ${name}, 输入: ${inputs.length}, 输出: ${outputs.length}`);
     }
 
-    // 添加输入端口
     addInput(name) {
         const newInput = {
             id: `${this.id}_input_${this.inputs.length}`,
@@ -151,11 +143,9 @@ class Component {
             connectedTo: null
         };
         this.inputs.push(newInput);
-        this.updateHeight();
         return newInput;
     }
 
-    // 添加输出端口
     addOutput(name) {
         const newOutput = {
             id: `${this.id}_output_${this.outputs.length}`,
@@ -165,43 +155,9 @@ class Component {
             connectedTo: null
         };
         this.outputs.push(newOutput);
-        this.updateHeight();
         return newOutput;
     }
 
-    // 删除输入端口
-    removeInput(index) {
-        if (index >= 0 && index < this.inputs.length) {
-            this.inputs.splice(index, 1);
-            // 重新索引
-            this.inputs.forEach((input, idx) => {
-                input.index = idx;
-                input.id = `${this.id}_input_${idx}`;
-            });
-            this.updateHeight();
-        }
-    }
-
-    // 删除输出端口
-    removeOutput(index) {
-        if (index >= 0 && index < this.outputs.length) {
-            this.outputs.splice(index, 1);
-            this.outputs.forEach((output, idx) => {
-                output.index = idx;
-                output.id = `${this.id}_output_${idx}`;
-            });
-            this.updateHeight();
-        }
-    }
-
-    // 根据端口数量动态调整高度
-    updateHeight() {
-        const maxPorts = Math.max(this.inputs.length, this.outputs.length);
-        // 基础高度70 + 每个端口增加6px，最小70，最大140
-        this.height = Math.min(140, Math.max(70, 70 + maxPorts * 5));
-    }
-
-    // 获取端口位置
     getPortPosition(port) {
         const totalPorts = port.position === 'left' ? this.inputs.length : this.outputs.length;
         const portSpacing = (this.height - 25) / (totalPorts + 1);
@@ -213,7 +169,6 @@ class Component {
         };
     }
     
-    // 获取图标位置（电池名称和端口之间的中间区域）
     getIconPosition() {
         return {
             x: this.x + this.width / 2,
@@ -221,7 +176,6 @@ class Component {
         };
     }
     
-    // 获取电池名称位置
     getNamePosition() {
         return {
             x: this.x + 8,
@@ -241,31 +195,12 @@ class Connection {
     }
 }
 
-// ========== 历史记录条目 ==========
-class HistoryEntry {
-    constructor(components, connections, action) {
-        this.components = JSON.parse(JSON.stringify(components));
-        this.connections = JSON.parse(JSON.stringify(connections));
-        this.action = action;
-        this.timestamp = Date.now();
-    }
-}
-
 // ========== 预设颜色 ==========
 const presetColors = [
-    '#2d2d2d',  // 默认灰
-    '#4caf50',  // 绿色
-    '#2196f3',  // 蓝色
-    '#f44336',  // 红色
-    '#9c27b0',  // 紫色
-    '#ff9800',  // 橙色
-    '#00bcd4',  // 青色
-    '#e91e63',  // 粉色
-    '#ffc107',  // 黄色
-    '#607d8b'   // 蓝灰色
+    '#2d2d2d', '#4caf50', '#2196f3', '#f44336', '#9c27b0',
+    '#ff9800', '#00bcd4', '#e91e63', '#ffc107', '#607d8b'
 ];
 
-// 获取电池类型对应的默认颜色
 function getComponentColorByName(name) {
     if (!name) return '#2d2d2d';
     const lowerName = name.toLowerCase();
@@ -275,59 +210,5 @@ function getComponentColorByName(name) {
     if (lowerName.includes('gravity')) return '#9c27b0';
     if (lowerName.includes('wind')) return '#00bcd4';
     if (lowerName.includes('collide')) return '#f44336';
-    if (lowerName.includes('display')) return '#e91e63';
-    if (lowerName.includes('slider')) return '#ffc107';
-    if (lowerName.includes('list')) return '#607d8b';
     return '#2d2d2d';
-}
-
-// ========== 导出组件绘制辅助函数（供 canvas.js 使用）=========
-// 注意：实际绘制在 canvas.js 中完成，这里只提供数据结构和工具函数
-
-// 预加载雪碧图（在页面加载时调用）
-function preloadSprite() {
-    loadSpriteImage(() => {
-        console.log('雪碧图预加载完成');
-    });
-}
-
-// 在 canvas 上绘制电池图标（供 canvas.js 调用）
-function drawComponentIcon(ctx, component, x, y, size = 24) {
-    const iconX = x - size / 2;
-    const iconY = y - size / 2;
-    
-    // 如果有雪碧图坐标且雪碧图已加载，绘制雪碧图
-    if (component.spriteX !== null && component.spriteY !== null && spriteImage && spriteImage.complete) {
-        try {
-            ctx.drawImage(
-                spriteImage,
-                component.spriteX, component.spriteY, size, size,
-                iconX, iconY, size, size
-            );
-            return true;
-        } catch (e) {
-            console.warn('绘制雪碧图失败:', e);
-        }
-    }
-    
-    // 降级方案：绘制默认图标
-    ctx.fillStyle = '#555';
-    ctx.fillRect(iconX, iconY, size, size);
-    ctx.fillStyle = '#888';
-    ctx.font = '12px monospace';
-    ctx.fillText('🦘', iconX + 6, iconY + 18);
-    
-    return false;
-}
-
-// 导出初始化函数
-function initComponents() {
-    preloadSprite();
-}
-
-// 如果需要在页面加载时自动初始化
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        initComponents();
-    });
 }
