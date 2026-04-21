@@ -5,6 +5,9 @@ let lang = 'cn';
 let componentsData = {};
 let groupsList = [];
 
+// 跨项目引用 JSON 数据（从 Rhino-gh-kangaroo-docs 仓库）
+const JSON_URL = 'https://cdn.jsdelivr.net/gh/zhang1394725324/Rhino-gh-kangaroo-docs@main/data/kangaroo.json';
+
 // 分组配置
 const GROUP_ORDER = [
     'Goals-6dof', 'Goals-Angle', 'Goals-Co', 'Goals-Col', 'Goals-Lin',
@@ -25,12 +28,29 @@ const groupDisplayNames = {
     'Utility': '实用工具'
 };
 
-// 加载组件数据
+// 英文分组名称
+const groupDisplayNamesEn = {
+    'Goals-6dof': '6-DOF Constraints',
+    'Goals-Angle': 'Angle Constraints',
+    'Goals-Co': 'Coincident/Collinear/Coplanar',
+    'Goals-Col': 'Collision Constraints',
+    'Goals-Lin': 'Length/Spring Constraints',
+    'Goals-Mesh': 'Mesh/Surface Constraints',
+    'Goals-On': 'On Geometry',
+    'Goals-Pt': 'Point/Anchor Constraints',
+    'Main': 'Solver & Core',
+    'Mesh': 'Mesh Tools',
+    'Utility': 'Utilities'
+};
+
+// ========== 数据加载 ==========
 function loadComponentsData() {
     const container = document.getElementById('categoriesContainer');
-    container.innerHTML = '<div style="color: #888; text-align: center; padding: 40px;">📦 加载组件数据中...</div>';
+    if (!container) return;
     
-    fetch('data/kangaroo.json?' + Date.now())
+    container.innerHTML = '<div style="color: #888; text-align: center; padding: 40px;"><i class="fas fa-spinner fa-pulse"></i> 加载组件数据中...</div>';
+    
+    fetch(JSON_URL + '?' + Date.now())
         .then(res => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
@@ -47,13 +67,18 @@ function loadComponentsData() {
         })
         .catch(err => {
             console.error('❌ 数据加载失败:', err);
-            container.innerHTML = `<div style="color:#dc2626;text-align:center;padding:40px;">数据加载失败: ${err.message}<br>请确保 data/kangaroo.json 文件存在</div>`;
+            container.innerHTML = `<div style="color:#dc2626;text-align:center;padding:40px;">
+                <i class="fas fa-exclamation-triangle"></i> 数据加载失败: ${err.message}<br>
+                <small>请确保资源仓库可访问: ${JSON_URL}</small>
+            </div>`;
         });
 }
 
-// 渲染分类卡片
+// ========== 渲染分类卡片 ==========
 function renderCategories() {
     const container = document.getElementById('categoriesContainer');
+    if (!container) return;
+    
     container.innerHTML = '';
     
     const grid = document.createElement('div');
@@ -83,7 +108,7 @@ function renderCategories() {
         iconsGrid.className = 'card-icons-grid';
         iconsGrid.setAttribute('data-columns', columns);
         
-        // 填充图标
+        // 填充图标（4行 x columns列）
         const totalSlots = 4 * columns;
         for (let i = 0; i < totalSlots; i++) {
             if (i < items.length) {
@@ -102,7 +127,8 @@ function renderCategories() {
         const titleArea = document.createElement('div');
         titleArea.className = 'category-title';
         const titleSpan = document.createElement('span');
-        titleSpan.textContent = lang === 'cn' ? groupDisplayNames[groupKey] : groupKey;
+        const displayName = lang === 'cn' ? groupDisplayNames[groupKey] : groupDisplayNamesEn[groupKey];
+        titleSpan.textContent = displayName || groupKey;
         titleArea.appendChild(titleSpan);
         
         card.appendChild(iconsArea);
@@ -114,7 +140,7 @@ function renderCategories() {
     console.log(`✅ 已渲染 ${groupsList.length} 个分类卡片`);
 }
 
-// 创建图标项（可拖拽）
+// ========== 创建图标项（可拖拽）==========
 function createIconItem(item) {
     const iconItem = document.createElement('div');
     iconItem.className = 'card-icon-item';
@@ -127,12 +153,12 @@ function createIconItem(item) {
     iconItem.dataset.componentName = item.name;
     iconItem.dataset.componentInputs = JSON.stringify(item.inputs || []);
     iconItem.dataset.componentOutputs = JSON.stringify(item.outputs || []);
-    iconItem.dataset.spriteX = item.spriteX;
-    iconItem.dataset.spriteY = item.spriteY;
+    iconItem.dataset.spriteX = item.spriteX || 0;
+    iconItem.dataset.spriteY = item.spriteY || 0;
     
     const sprite = document.createElement('div');
     sprite.className = 'card-icon-sprite';
-    sprite.style.backgroundPosition = `-${item.spriteX}px -${item.spriteY}px`;
+    sprite.style.backgroundPosition = `-${item.spriteX || 0}px -${item.spriteY || 0}px`;
     
     const nameSpan = document.createElement('div');
     nameSpan.className = 'card-icon-name';
@@ -152,8 +178,8 @@ function createIconItem(item) {
             name: item.name,
             inputs: item.inputs || [],
             outputs: item.outputs || [],
-            spriteX: item.spriteX,
-            spriteY: item.spriteY
+            spriteX: item.spriteX || 0,
+            spriteY: item.spriteY || 0
         };
         e.dataTransfer.setData('text/plain', JSON.stringify(dragData));
         e.dataTransfer.effectAllowed = 'copy';
@@ -168,7 +194,7 @@ function createIconItem(item) {
     return iconItem;
 }
 
-// 设置画布拖拽放置
+// ========== 设置画布拖拽放置 ==========
 function setupCanvasDrop() {
     const canvasContainer = document.querySelector('.canvas-container');
     if (!canvasContainer) return;
@@ -201,8 +227,8 @@ function setupCanvasDrop() {
         const newComponent = new Component(
             generateId(),
             componentData.name,
-            canvasX - 70,
-            canvasY - 35,
+            canvasX - 75,
+            canvasY - 40,
             componentData.inputs || [],
             componentData.outputs || []
         );
@@ -210,13 +236,14 @@ function setupCanvasDrop() {
         // 设置图标位置（雪碧图坐标）
         newComponent.spriteX = componentData.spriteX;
         newComponent.spriteY = componentData.spriteY;
+        newComponent.color = getComponentColorByName(componentData.name);
         
         canvasManager.addComponent(newComponent);
         canvasManager.updateStatus(`${t('statusAdded')}: ${componentData.name}`);
     });
 }
 
-// 语言切换
+// ========== 语言切换 ==========
 function setupLanguage() {
     const langBtn = document.getElementById('langBtn');
     if (langBtn) {
@@ -224,32 +251,40 @@ function setupLanguage() {
             lang = lang === 'cn' ? 'en' : 'cn';
             langBtn.textContent = lang === 'cn' ? 'EN' : '中';
             renderCategories();
+            
+            // 如果有选中的组件，刷新详情显示
+            if (window.currentDetailItem) {
+                showComponentDetail(window.currentDetailItem);
+            }
         });
     }
 }
 
-// 搜索功能
+// ========== 搜索功能 ==========
 function setupLibrarySearch() {
     const searchInput = document.getElementById('librarySearch');
     if (!searchInput) return;
     
     searchInput.addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        document.querySelectorAll('.card-icon-item').forEach(item => {
+        const term = e.target.value.toLowerCase().trim();
+        const iconItems = document.querySelectorAll('.card-icon-item');
+        
+        iconItems.forEach(item => {
             const name = item.title?.toLowerCase() || '';
-            const parentCard = item.closest('.category-card');
-            if (parentCard) {
-                const hasMatch = name.includes(term);
-                item.style.display = hasMatch ? '' : 'none';
-                // 如果卡片内所有项都隐藏，则隐藏卡片
-                const visibleItems = parentCard.querySelectorAll('.card-icon-item[style=""]');
-                parentCard.style.display = visibleItems.length === 0 ? 'none' : '';
-            }
+            const matches = term === '' || name.includes(term);
+            item.style.display = matches ? '' : 'none';
+        });
+        
+        // 显示/隐藏空卡片
+        const cards = document.querySelectorAll('.category-card');
+        cards.forEach(card => {
+            const visibleItems = card.querySelectorAll('.card-icon-item[style=""]');
+            card.style.display = visibleItems.length === 0 && term !== '' ? 'none' : '';
         });
     });
 }
 
-// 其他辅助函数
+// ========== 自定义电池 ==========
 function setupCustomComponent() {
     const addBtn = document.getElementById('addCustomComponent');
     if (addBtn) {
@@ -259,7 +294,6 @@ function setupCustomComponent() {
             const inputs = prompt('输入端口 (逗号分隔):', 'A,B');
             const outputs = prompt('输出端口 (逗号分隔):', 'Result');
             
-            // 添加到临时模板（不保存到文件）
             if (canvasManager) {
                 const newComp = new Component(
                     generateId(),
@@ -268,6 +302,7 @@ function setupCustomComponent() {
                     inputs ? inputs.split(',').map(s => s.trim()) : [],
                     outputs ? outputs.split(',').map(s => s.trim()) : []
                 );
+                newComp.color = getComponentColorByName(name);
                 canvasManager.addComponent(newComp);
                 canvasManager.updateStatus(`已添加: ${name}`);
             }
@@ -275,6 +310,7 @@ function setupCustomComponent() {
     }
 }
 
+// ========== 导入导出 ==========
 function setupImportExport() {
     const exportBtn = document.getElementById('exportJson');
     const importBtn = document.getElementById('importJson');
@@ -291,7 +327,7 @@ function setupImportExport() {
             a.download = `kangaroo2_${Date.now()}.json`;
             a.click();
             URL.revokeObjectURL(url);
-            canvasManager.updateStatus('已导出');
+            canvasManager.updateStatus(t('statusExported'));
         });
     }
     
@@ -305,7 +341,7 @@ function setupImportExport() {
                 try {
                     const data = JSON.parse(event.target.result);
                     canvasManager.fromJSON(data);
-                    canvasManager.updateStatus(`已导入: ${file.name}`);
+                    canvasManager.updateStatus(`${t('statusImported')}: ${file.name}`);
                 } catch (err) {
                     alert('解析失败: ' + err.message);
                 }
@@ -316,6 +352,7 @@ function setupImportExport() {
     }
 }
 
+// ========== 清空画布 ==========
 function setupClearCanvas() {
     const clearBtn = document.getElementById('clearCanvas');
     if (clearBtn) {
@@ -323,6 +360,7 @@ function setupClearCanvas() {
     }
 }
 
+// ========== 适应画布 ==========
 function setupZoomFit() {
     const zoomFitBtn = document.getElementById('zoomFit');
     if (zoomFitBtn) {
@@ -330,39 +368,69 @@ function setupZoomFit() {
     }
 }
 
+// ========== 撤销重做 ==========
 function setupUndoRedo() {
     const undoBtn = document.getElementById('undoBtn');
     const redoBtn = document.getElementById('redoBtn');
     
-    if (undoBtn) undoBtn.addEventListener('click', () => canvasManager.undo());
-    if (redoBtn) redoBtn.addEventListener('click', () => canvasManager.redo());
+    if (undoBtn) {
+        undoBtn.addEventListener('click', () => {
+            canvasManager.undo();
+            canvasManager.updateStatus(t('statusUndo'));
+        });
+    }
+    if (redoBtn) {
+        redoBtn.addEventListener('click', () => {
+            canvasManager.redo();
+            canvasManager.updateStatus(t('statusRedo'));
+        });
+    }
 }
 
+// ========== 键盘快捷键 ==========
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
+        // 忽略输入框内的快捷键
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         
+        // Ctrl+Z / Ctrl+Y
         if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
             e.preventDefault();
-            if (e.shiftKey) canvasManager.redo();
-            else canvasManager.undo();
+            if (e.shiftKey) {
+                canvasManager.redo();
+                canvasManager.updateStatus(t('statusRedo'));
+            } else {
+                canvasManager.undo();
+                canvasManager.updateStatus(t('statusUndo'));
+            }
         } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
             e.preventDefault();
             canvasManager.redo();
-        } else if (e.key === 'Delete') {
+            canvasManager.updateStatus(t('statusRedo'));
+        }
+        // Delete
+        else if (e.key === 'Delete') {
             canvasManager.deleteSelectedComponents();
-        } else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        }
+        // Ctrl+D 复制
+        else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
             e.preventDefault();
             canvasManager.duplicateSelectedComponents();
-        } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+            canvasManager.updateStatus(t('statusCopied'));
+        }
+        // Ctrl+A 全选
+        else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
             e.preventDefault();
             canvasManager.selectAll();
-        } else if (e.key === 'Escape') {
+        }
+        // Esc 取消选择
+        else if (e.key === 'Escape') {
             canvasManager.clearSelection();
         }
     });
 }
 
+// ========== 帮助模态框 ==========
 function setupHelpModal() {
     const showHelpBtn = document.getElementById('showHelp');
     const helpModal = document.getElementById('helpModal');
@@ -385,18 +453,36 @@ function setupHelpModal() {
     }
 }
 
-// 初始化
+// ========== 组件详情（可选，如果不需要可以留空）==========
+async function showComponentDetail(item) {
+    // 这个函数可选，用于显示组件详情
+    // 如果你不需要详情功能，可以保持为空
+    console.log('组件详情:', item.name);
+}
+
+// ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
-    const canvas = document.getElementById('canvas');
-    if (!canvas) return;
+    console.log('🚀 初始化 Kangaroo2 电池编辑器...');
     
+    const canvas = document.getElementById('canvas');
+    if (!canvas) {
+        console.error('❌ 找不到 canvas 元素');
+        return;
+    }
+    
+    // 创建画布管理器
     canvasManager = new CanvasManager(canvas, null, (component) => {
         if (component) {
-            canvasManager.updateStatus(`已选中: ${component.name}`);
+            canvasManager.updateStatus(`${t('statusSelected')}: ${component.name}`);
+        } else {
+            canvasManager.updateStatus(t('statusReady'));
         }
     });
     
+    // 加载组件数据
     loadComponentsData();
+    
+    // 设置各种功能
     setupCanvasDrop();
     setupLanguage();
     setupLibrarySearch();
@@ -407,4 +493,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupUndoRedo();
     setupKeyboardShortcuts();
     setupHelpModal();
+    
+    console.log('✅ 初始化完成');
 });
