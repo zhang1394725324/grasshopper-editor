@@ -46,10 +46,18 @@ const groupDisplayNamesEn = {
 };
 
 // ========== 辅助函数：从 JSON 组件中提取输入端口名称 ==========
+// JSON 中的 parameters 格式: [{ name: "LineA", cn: "直线", ... }, ...]
 function extractInputs(item) {
     // 优先使用 parameters 字段
     if (item.parameters && Array.isArray(item.parameters)) {
-        return item.parameters.map(p => p.name || p);
+        return item.parameters.map(p => {
+            // 如果 p 是对象且有 name 属性，返回 name
+            if (typeof p === 'object' && p.name) {
+                return p.name;
+            }
+            // 如果 p 是字符串，直接返回
+            return p;
+        });
     }
     // 兼容旧格式 inputs
     if (item.inputs && Array.isArray(item.inputs)) {
@@ -59,10 +67,17 @@ function extractInputs(item) {
 }
 
 // ========== 辅助函数：从 JSON 组件中提取输出端口名称 ==========
+// JSON 中的 outputs 格式: [{ name: "A", cn: "角度", ... }, ...]
 function extractOutputs(item) {
-    // 优先使用 outputs 字段
     if (item.outputs && Array.isArray(item.outputs)) {
-        return item.outputs.map(o => o.name || o);
+        return item.outputs.map(o => {
+            // 如果 o 是对象且有 name 属性，返回 name
+            if (typeof o === 'object' && o.name) {
+                return o.name;
+            }
+            // 如果 o 是字符串，直接返回
+            return o;
+        });
     }
     return [];
 }
@@ -173,9 +188,11 @@ function createIconItem(item) {
     const displayName = lang === 'cn' ? (item.cn || item.name) : (item.en || item.name);
     iconItem.title = displayName;
     
-    // 提取输入和输出端口
+    // 提取输入和输出端口名称
     const inputs = extractInputs(item);
     const outputs = extractOutputs(item);
+    
+    console.log(`创建图标: ${item.name}`, { inputs, outputs });
     
     // 存储组件数据到 dataset
     iconItem.dataset.componentName = item.name;
@@ -214,7 +231,9 @@ function createIconItem(item) {
         e.dataTransfer.setData('text/plain', JSON.stringify(componentData));
         e.dataTransfer.effectAllowed = 'copy';
         iconItem.style.opacity = '0.5';
-        console.log('拖拽开始:', componentData.name, '输入:', inputs, '输出:', outputs);
+        console.log('拖拽开始:', componentData.name);
+        console.log('  输入端口:', componentData.inputs);
+        console.log('  输出端口:', componentData.outputs);
     });
     
     iconItem.addEventListener('dragend', (e) => {
@@ -264,7 +283,9 @@ function setupCanvasDrop() {
             return;
         }
         
-        console.log('放置电池:', componentData.name, '输入:', componentData.inputs, '输出:', componentData.outputs);
+        console.log('放置电池:', componentData.name);
+        console.log('  输入端口:', componentData.inputs);
+        console.log('  输出端口:', componentData.outputs);
         
         const rect = document.getElementById('canvas').getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
