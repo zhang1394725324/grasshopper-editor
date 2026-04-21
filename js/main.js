@@ -45,6 +45,28 @@ const groupDisplayNamesEn = {
     'Utility': 'Utilities'
 };
 
+// ========== 辅助函数：从 JSON 组件中提取输入端口名称 ==========
+function extractInputs(item) {
+    // 优先使用 parameters 字段
+    if (item.parameters && Array.isArray(item.parameters)) {
+        return item.parameters.map(p => p.name || p);
+    }
+    // 兼容旧格式 inputs
+    if (item.inputs && Array.isArray(item.inputs)) {
+        return item.inputs;
+    }
+    return [];
+}
+
+// ========== 辅助函数：从 JSON 组件中提取输出端口名称 ==========
+function extractOutputs(item) {
+    // 优先使用 outputs 字段
+    if (item.outputs && Array.isArray(item.outputs)) {
+        return item.outputs.map(o => o.name || o);
+    }
+    return [];
+}
+
 // ========== 数据加载 ==========
 function loadComponentsData() {
     const container = document.getElementById('categoriesContainer');
@@ -151,10 +173,14 @@ function createIconItem(item) {
     const displayName = lang === 'cn' ? (item.cn || item.name) : (item.en || item.name);
     iconItem.title = displayName;
     
+    // 提取输入和输出端口
+    const inputs = extractInputs(item);
+    const outputs = extractOutputs(item);
+    
     // 存储组件数据到 dataset
     iconItem.dataset.componentName = item.name;
-    iconItem.dataset.componentInputs = JSON.stringify(item.inputs || []);
-    iconItem.dataset.componentOutputs = JSON.stringify(item.outputs || []);
+    iconItem.dataset.componentInputs = JSON.stringify(inputs);
+    iconItem.dataset.componentOutputs = JSON.stringify(outputs);
     iconItem.dataset.spriteX = item.spriteX || 0;
     iconItem.dataset.spriteY = item.spriteY || 0;
     
@@ -178,8 +204,8 @@ function createIconItem(item) {
     iconItem.addEventListener('dragstart', (e) => {
         const componentData = {
             name: item.name,
-            inputs: item.inputs || [],
-            outputs: item.outputs || [],
+            inputs: inputs,
+            outputs: outputs,
             spriteX: item.spriteX || 0,
             spriteY: item.spriteY || 0
         };
@@ -188,7 +214,7 @@ function createIconItem(item) {
         e.dataTransfer.setData('text/plain', JSON.stringify(componentData));
         e.dataTransfer.effectAllowed = 'copy';
         iconItem.style.opacity = '0.5';
-        console.log('拖拽开始:', componentData.name);
+        console.log('拖拽开始:', componentData.name, '输入:', inputs, '输出:', outputs);
     });
     
     iconItem.addEventListener('dragend', (e) => {
@@ -238,7 +264,7 @@ function setupCanvasDrop() {
             return;
         }
         
-        console.log('放置电池:', componentData.name);
+        console.log('放置电池:', componentData.name, '输入:', componentData.inputs, '输出:', componentData.outputs);
         
         const rect = document.getElementById('canvas').getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
