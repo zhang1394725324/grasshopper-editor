@@ -2,7 +2,6 @@
 let canvasManager;
 let dragData = null;
 
-// 获取电池类型对应的颜色
 function getComponentColor(name) {
     if (name.includes('Solver')) return '#ff6b6b';
     if (name.includes('Anchor')) return '#4ecdc4';
@@ -14,7 +13,6 @@ function getComponentColor(name) {
     return '#ffaa00';
 }
 
-// 创建库中的电池项
 function createLibraryItem(template) {
     const div = document.createElement('div');
     div.className = 'component-item';
@@ -54,7 +52,6 @@ function createLibraryItem(template) {
     return div;
 }
 
-// 拖拽事件
 function handleDragStart(e) {
     const target = e.target.closest('.component-item');
     if (!target) return;
@@ -76,25 +73,17 @@ function handleDragEnd(e) {
     dragData = null;
 }
 
-// 初始化组件库
 function initComponentLibrary() {
     const libraryContainer = document.getElementById('componentLibrary');
-    if (!libraryContainer) {
-        console.error('找不到 componentLibrary 元素');
-        return;
-    }
+    if (!libraryContainer) return;
     
     libraryContainer.innerHTML = '';
     
     componentTemplates.forEach(template => {
-        const componentDiv = createLibraryItem(template);
-        libraryContainer.appendChild(componentDiv);
+        libraryContainer.appendChild(createLibraryItem(template));
     });
-    
-    console.log(`已加载 ${componentTemplates.length} 个电池`);
 }
 
-// 设置画布拖拽放置
 function setupCanvasDrop() {
     const canvasContainer = document.querySelector('.canvas-container');
     if (!canvasContainer) return;
@@ -124,68 +113,55 @@ function setupCanvasDrop() {
         const canvasX = (mouseX - canvasManager.panOffset.x) / canvasManager.zoom;
         const canvasY = (mouseY - canvasManager.panOffset.y) / canvasManager.zoom;
         
-        const newComponent = new Component(
-            generateId(),
-            componentData.name,
-            canvasX - 65,
-            canvasY - 30,
-            componentData.inputs,
-            componentData.outputs
-        );
+        const newComponent = new Component(generateId(), componentData.name,
+            canvasX - 70, canvasY - 35,
+            componentData.inputs, componentData.outputs);
+        newComponent.color = getComponentColor(componentData.name);
         
         canvasManager.addComponent(newComponent);
-        
-        const status = document.getElementById('status');
-        if (status) status.textContent = `已添加: ${componentData.name}`;
+        canvasManager.updateStatus(`${t('statusAdded')}: ${componentData.name}`);
     });
 }
 
-// 自定义电池对话框
-function showCustomComponentDialog() {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h3>创建自定义电池</h3>
-            <input type="text" id="compName" placeholder="电池名称" value="MyComponent">
-            <input type="text" id="compInputs" placeholder="输入端口 (逗号分隔)" value="A,B">
-            <input type="text" id="compOutputs" placeholder="输出端口 (逗号分隔)" value="Result">
-            <div class="modal-buttons">
-                <button id="confirmBtn">创建</button>
-                <button id="cancelBtn">取消</button>
-            </div>
-        </div>
-    `;
+function setupLibrarySearch() {
+    const searchInput = document.getElementById('librarySearch');
+    if (!searchInput) return;
     
-    document.body.appendChild(modal);
-    
-    document.getElementById('confirmBtn').onclick = () => {
-        const name = document.getElementById('compName').value.trim();
-        const inputsStr = document.getElementById('compInputs').value.trim();
-        const outputsStr = document.getElementById('compOutputs').value.trim();
-        
-        if (name) {
-            const inputs = inputsStr ? inputsStr.split(',').map(s => s.trim()) : [];
-            const outputs = outputsStr ? outputsStr.split(',').map(s => s.trim()) : [];
-            
-            componentTemplates.push({ name, inputs, outputs });
-            initComponentLibrary();
-            
-            const status = document.getElementById('status');
-            if (status) status.textContent = `已添加: ${name}`;
-        }
-        modal.remove();
-    };
-    
-    document.getElementById('cancelBtn').onclick = () => modal.remove();
+    searchInput.addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        document.querySelectorAll('.component-item').forEach(item => {
+            const name = item.querySelector('.component-name')?.textContent.toLowerCase() || '';
+            item.style.display = name.includes(term) ? '' : 'none';
+        });
+    });
 }
 
-// 导入导出功能
+function setupCustomComponent() {
+    const addBtn = document.getElementById('addCustomComponent');
+    if (addBtn) {
+        addBtn.addEventListener('click', () => {
+            const name = prompt('电池名称:', 'MyComponent');
+            if (!name) return;
+            const inputs = prompt('输入端口 (逗号分隔):', 'A,B');
+            const outputs = prompt('输出端口 (逗号分隔):', 'Result');
+            
+            const newTemplate = {
+                name: name,
+                inputs: inputs ? inputs.split(',').map(s => s.trim()) : [],
+                outputs: outputs ? outputs.split(',').map(s => s.trim()) : []
+            };
+            componentTemplates.push(newTemplate);
+            initComponentLibrary();
+            setupLibrarySearch();
+            canvasManager.updateStatus(`${t('statusAdded')}: ${name}`);
+        });
+    }
+}
+
 function setupImportExport() {
     const exportBtn = document.getElementById('exportJson');
     const importBtn = document.getElementById('importJson');
     const importFile = document.getElementById('importFile');
-    const clearBtn = document.getElementById('clearCanvas');
     
     if (exportBtn) {
         exportBtn.addEventListener('click', () => {
@@ -198,6 +174,7 @@ function setupImportExport() {
             a.download = `grasshopper_${Date.now()}.json`;
             a.click();
             URL.revokeObjectURL(url);
+            canvasManager.updateStatus(t('statusExported'));
         });
     }
     
@@ -211,8 +188,7 @@ function setupImportExport() {
                 try {
                     const data = JSON.parse(event.target.result);
                     canvasManager.fromJSON(data);
-                    const status = document.getElementById('status');
-                    if (status) status.textContent = `已导入: ${file.name}`;
+                    canvasManager.updateStatus(`${t('statusImported')}: ${file.name}`);
                 } catch (err) {
                     alert('解析失败: ' + err.message);
                 }
@@ -221,78 +197,95 @@ function setupImportExport() {
             importFile.value = '';
         });
     }
-    
+}
+
+function setupClearCanvas() {
+    const clearBtn = document.getElementById('clearCanvas');
     if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            if (confirm('确定清空画布？')) {
-                canvasManager.components.clear();
-                canvasManager.connections = [];
-                canvasManager.draw();
-            }
-        });
+        clearBtn.addEventListener('click', () => canvasManager.clearCanvas());
     }
 }
 
-// 键盘快捷键
+function setupZoomFit() {
+    const zoomFitBtn = document.getElementById('zoomFit');
+    if (zoomFitBtn) {
+        zoomFitBtn.addEventListener('click', () => canvasManager.fitToView());
+    }
+}
+
+function setupUndoRedo() {
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+    
+    if (undoBtn) undoBtn.addEventListener('click', () => canvasManager.undo());
+    if (redoBtn) redoBtn.addEventListener('click', () => canvasManager.redo());
+}
+
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Delete' && canvasManager.selectedComponent) {
-            canvasManager.deleteComponent(canvasManager.selectedComponent.id);
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'd' && canvasManager.selectedComponent) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
             e.preventDefault();
-            canvasManager.duplicateComponent(canvasManager.selectedComponent);
+            if (e.shiftKey) canvasManager.redo();
+            else canvasManager.undo();
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+            e.preventDefault();
+            canvasManager.redo();
+        } else if (e.key === 'Delete') {
+            canvasManager.deleteSelectedComponents();
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+            e.preventDefault();
+            canvasManager.duplicateSelectedComponents();
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+            e.preventDefault();
+            canvasManager.selectAll();
+        } else if (e.key === 'Escape') {
+            canvasManager.clearSelection();
         }
     });
 }
 
-// 添加自定义电池按钮
-function setupCustomButton() {
-    const addBtn = document.getElementById('addCustomComponent');
-    if (addBtn) addBtn.addEventListener('click', showCustomComponentDialog);
-}
-
-// 添加搜索功能
-function setupSearch() {
-    const libraryHeader = document.querySelector('.library-header');
-    if (!libraryHeader) return;
+function setupHelpModal() {
+    const showHelpBtn = document.getElementById('showHelp');
+    const helpModal = document.getElementById('helpModal');
+    const closeHelpBtn = document.getElementById('closeHelpBtn');
     
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.placeholder = '🔍 搜索电池...';
-    searchInput.style.cssText = 'width: calc(100% - 24px); margin: 8px 12px; padding: 6px 10px; background: #4a4a4a; border: 1px solid #666; color: #ddd; border-radius: 4px;';
-    libraryHeader.parentElement.insertBefore(searchInput, libraryHeader.nextSibling);
-    
-    searchInput.addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        document.querySelectorAll('.component-item').forEach(item => {
-            const name = item.querySelector('.component-name')?.textContent.toLowerCase() || '';
-            item.style.display = name.includes(term) ? '' : 'none';
+    if (showHelpBtn) {
+        showHelpBtn.addEventListener('click', () => {
+            if (helpModal) helpModal.style.display = 'flex';
         });
-    });
-}
-
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('页面加载完成，初始化...');
-    
-    const canvas = document.getElementById('canvas');
-    if (!canvas) {
-        console.error('找不到 canvas 元素');
-        return;
     }
     
+    if (closeHelpBtn && helpModal) {
+        closeHelpBtn.addEventListener('click', () => {
+            helpModal.style.display = 'none';
+        });
+        
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) helpModal.style.display = 'none';
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('canvas');
+    if (!canvas) return;
+    
     canvasManager = new CanvasManager(canvas, componentTemplates, (component) => {
-        const status = document.getElementById('status');
-        if (status) status.textContent = component ? `已选中: ${component.name}` : '就绪';
+        if (component) {
+            canvasManager.updateStatus(`${t('statusSelected')}: ${component.name}`);
+        }
     });
     
     initComponentLibrary();
-    setupSearch();
+    setupLibrarySearch();
     setupCanvasDrop();
-    setupCustomButton();
+    setupCustomComponent();
     setupImportExport();
+    setupClearCanvas();
+    setupZoomFit();
+    setupUndoRedo();
     setupKeyboardShortcuts();
-    
-    console.log('初始化完成');
+    setupHelpModal();
 });
