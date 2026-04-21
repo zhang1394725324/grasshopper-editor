@@ -5,13 +5,10 @@ let lang = 'cn';
 let componentsData = {};
 let groupsList = [];
 
-// 挂载到 window 对象，确保全局可访问
 window.dragData = dragData;
 
-// 跨项目引用 JSON 数据（使用 GitHub Raw，已验证可用）
 const JSON_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json';
 
-// 分组配置
 const GROUP_ORDER = [
     'Goals-6dof', 'Goals-Angle', 'Goals-Co', 'Goals-Col', 'Goals-Lin',
     'Goals-Mesh', 'Goals-On', 'Goals-Pt', 'Main', 'Mesh', 'Utility'
@@ -45,44 +42,31 @@ const groupDisplayNamesEn = {
     'Utility': 'Utilities'
 };
 
-// ========== 辅助函数：从 JSON 组件中提取输入端口名称 ==========
-// JSON 中的 parameters 格式: [{ name: "LineA", cn: "直线", ... }, ...]
+// 提取输入端口名称
 function extractInputs(item) {
-    // 优先使用 parameters 字段
     if (item.parameters && Array.isArray(item.parameters)) {
         return item.parameters.map(p => {
-            // 如果 p 是对象且有 name 属性，返回 name
-            if (typeof p === 'object' && p.name) {
-                return p.name;
-            }
-            // 如果 p 是字符串，直接返回
+            if (typeof p === 'object' && p.name) return p.name;
             return p;
         });
     }
-    // 兼容旧格式 inputs
     if (item.inputs && Array.isArray(item.inputs)) {
         return item.inputs;
     }
     return [];
 }
 
-// ========== 辅助函数：从 JSON 组件中提取输出端口名称 ==========
-// JSON 中的 outputs 格式: [{ name: "A", cn: "角度", ... }, ...]
+// 提取输出端口名称
 function extractOutputs(item) {
     if (item.outputs && Array.isArray(item.outputs)) {
         return item.outputs.map(o => {
-            // 如果 o 是对象且有 name 属性，返回 name
-            if (typeof o === 'object' && o.name) {
-                return o.name;
-            }
-            // 如果 o 是字符串，直接返回
+            if (typeof o === 'object' && o.name) return o.name;
             return o;
         });
     }
     return [];
 }
 
-// ========== 数据加载 ==========
 function loadComponentsData() {
     const container = document.getElementById('categoriesContainer');
     if (!container) return;
@@ -107,19 +91,16 @@ function loadComponentsData() {
         .catch(err => {
             console.error('❌ 数据加载失败:', err);
             container.innerHTML = `<div style="color:#dc2626;text-align:center;padding:40px;">
-                <i class="fas fa-exclamation-triangle"></i> 数据加载失败: ${err.message}<br>
-                <small>请检查网络连接</small>
+                <i class="fas fa-exclamation-triangle"></i> 数据加载失败: ${err.message}
             </div>`;
         });
 }
 
-// ========== 渲染分类卡片 ==========
 function renderCategories() {
     const container = document.getElementById('categoriesContainer');
     if (!container) return;
     
     container.innerHTML = '';
-    
     const grid = document.createElement('div');
     grid.className = 'categories-grid';
     
@@ -128,8 +109,6 @@ function renderCategories() {
         if (!items || items.length === 0) return;
         
         const itemCount = items.length;
-        
-        // 计算列数
         let columns = 2;
         if (itemCount <= 8) columns = 2;
         else if (itemCount <= 12) columns = 3;
@@ -147,12 +126,10 @@ function renderCategories() {
         iconsGrid.className = 'card-icons-grid';
         iconsGrid.setAttribute('data-columns', columns);
         
-        // 填充图标（4行 x columns列）
         const totalSlots = 4 * columns;
         for (let i = 0; i < totalSlots; i++) {
             if (i < items.length) {
-                const item = items[i];
-                const iconItem = createIconItem(item);
+                const iconItem = createIconItem(items[i]);
                 iconsGrid.appendChild(iconItem);
             } else {
                 const emptyItem = document.createElement('div');
@@ -179,7 +156,6 @@ function renderCategories() {
     console.log(`✅ 已渲染 ${groupsList.length} 个分类卡片`);
 }
 
-// ========== 创建图标项（可拖拽）==========
 function createIconItem(item) {
     const iconItem = document.createElement('div');
     iconItem.className = 'card-icon-item';
@@ -188,13 +164,14 @@ function createIconItem(item) {
     const displayName = lang === 'cn' ? (item.cn || item.name) : (item.en || item.name);
     iconItem.title = displayName;
     
-    // 提取输入和输出端口名称
+    // 提取端口
     const inputs = extractInputs(item);
     const outputs = extractOutputs(item);
     
-    console.log(`创建图标: ${item.name}`, { inputs, outputs });
+    console.log(`📦 创建图标: ${item.name}`);
+    console.log(`   输入端口:`, inputs);
+    console.log(`   输出端口:`, outputs);
     
-    // 存储组件数据到 dataset
     iconItem.dataset.componentName = item.name;
     iconItem.dataset.componentInputs = JSON.stringify(inputs);
     iconItem.dataset.componentOutputs = JSON.stringify(outputs);
@@ -231,9 +208,9 @@ function createIconItem(item) {
         e.dataTransfer.setData('text/plain', JSON.stringify(componentData));
         e.dataTransfer.effectAllowed = 'copy';
         iconItem.style.opacity = '0.5';
-        console.log('拖拽开始:', componentData.name);
-        console.log('  输入端口:', componentData.inputs);
-        console.log('  输出端口:', componentData.outputs);
+        console.log(`🚀 拖拽开始: ${componentData.name}`);
+        console.log(`   输入:`, componentData.inputs);
+        console.log(`   输出:`, componentData.outputs);
     });
     
     iconItem.addEventListener('dragend', (e) => {
@@ -245,7 +222,6 @@ function createIconItem(item) {
     return iconItem;
 }
 
-// ========== 设置画布拖拽放置 ==========
 function setupCanvasDrop() {
     const canvasContainer = document.querySelector('.canvas-container');
     if (!canvasContainer) return;
@@ -260,17 +236,13 @@ function setupCanvasDrop() {
         
         let componentData = null;
         
-        // 尝试从拖拽数据获取
         try {
             const jsonData = e.dataTransfer.getData('text/plain');
             if (jsonData) {
                 componentData = JSON.parse(jsonData);
             }
-        } catch (err) {
-            console.warn('解析拖拽数据失败:', err);
-        }
+        } catch (err) {}
         
-        // 也检查全局 dragData
         if (!componentData && window.dragData) {
             componentData = window.dragData;
         }
@@ -283,9 +255,9 @@ function setupCanvasDrop() {
             return;
         }
         
-        console.log('放置电池:', componentData.name);
-        console.log('  输入端口:', componentData.inputs);
-        console.log('  输出端口:', componentData.outputs);
+        console.log(`📍 放置电池: ${componentData.name}`);
+        console.log(`   输入端口:`, componentData.inputs);
+        console.log(`   输出端口:`, componentData.outputs);
         
         const rect = document.getElementById('canvas').getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
@@ -294,11 +266,12 @@ function setupCanvasDrop() {
         const canvasX = (mouseX - canvasManager.panOffset.x) / canvasManager.zoom;
         const canvasY = (mouseY - canvasManager.panOffset.y) / canvasManager.zoom;
         
+        // 创建电池，传入端口数组
         const newComponent = new Component(
             generateId(),
             componentData.name,
             canvasX - 75,
-            canvasY - 40,
+            canvasY - 35,
             componentData.inputs || [],
             componentData.outputs || []
         );
@@ -312,7 +285,6 @@ function setupCanvasDrop() {
     });
 }
 
-// ========== 语言切换 ==========
 function setupLanguage() {
     const langBtn = document.getElementById('langBtn');
     if (langBtn) {
@@ -320,15 +292,10 @@ function setupLanguage() {
             lang = lang === 'cn' ? 'en' : 'cn';
             langBtn.textContent = lang === 'cn' ? 'EN' : '中';
             renderCategories();
-            
-            if (window.currentDetailItem) {
-                showComponentDetail(window.currentDetailItem);
-            }
         });
     }
 }
 
-// ========== 搜索功能 ==========
 function setupLibrarySearch() {
     const searchInput = document.getElementById('librarySearch');
     if (!searchInput) return;
@@ -351,7 +318,6 @@ function setupLibrarySearch() {
     });
 }
 
-// ========== 自定义电池 ==========
 function setupCustomComponent() {
     const addBtn = document.getElementById('addCustomComponent');
     if (addBtn) {
@@ -377,7 +343,6 @@ function setupCustomComponent() {
     }
 }
 
-// ========== 导入导出 ==========
 function setupImportExport() {
     const exportBtn = document.getElementById('exportJson');
     const importBtn = document.getElementById('importJson');
@@ -419,7 +384,6 @@ function setupImportExport() {
     }
 }
 
-// ========== 清空画布 ==========
 function setupClearCanvas() {
     const clearBtn = document.getElementById('clearCanvas');
     if (clearBtn) {
@@ -427,7 +391,6 @@ function setupClearCanvas() {
     }
 }
 
-// ========== 适应画布 ==========
 function setupZoomFit() {
     const zoomFitBtn = document.getElementById('zoomFit');
     if (zoomFitBtn) {
@@ -435,7 +398,6 @@ function setupZoomFit() {
     }
 }
 
-// ========== 撤销重做 ==========
 function setupUndoRedo() {
     const undoBtn = document.getElementById('undoBtn');
     const redoBtn = document.getElementById('redoBtn');
@@ -454,7 +416,6 @@ function setupUndoRedo() {
     }
 }
 
-// ========== 键盘快捷键 ==========
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -463,21 +424,17 @@ function setupKeyboardShortcuts() {
             e.preventDefault();
             if (e.shiftKey) {
                 canvasManager.redo();
-                canvasManager.updateStatus(t('statusRedo'));
             } else {
                 canvasManager.undo();
-                canvasManager.updateStatus(t('statusUndo'));
             }
         } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
             e.preventDefault();
             canvasManager.redo();
-            canvasManager.updateStatus(t('statusRedo'));
         } else if (e.key === 'Delete') {
             canvasManager.deleteSelectedComponents();
         } else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
             e.preventDefault();
             canvasManager.duplicateSelectedComponents();
-            canvasManager.updateStatus(t('statusCopied'));
         } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
             e.preventDefault();
             canvasManager.selectAll();
@@ -487,7 +444,6 @@ function setupKeyboardShortcuts() {
     });
 }
 
-// ========== 帮助模态框 ==========
 function setupHelpModal() {
     const showHelpBtn = document.getElementById('showHelp');
     const helpModal = document.getElementById('helpModal');
@@ -510,12 +466,7 @@ function setupHelpModal() {
     }
 }
 
-// ========== 组件详情（可选）==========
-async function showComponentDetail(item) {
-    console.log('组件详情:', item.name);
-}
-
-// ========== 初始化 ==========
+// 初始化
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 初始化 Kangaroo2 电池编辑器...');
     
@@ -545,10 +496,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setupKeyboardShortcuts();
     setupHelpModal();
     
-    // 预加载雪碧图
     if (typeof loadSpriteImage === 'function') {
         loadSpriteImage(() => {
-            console.log('雪碧图已加载，刷新画布');
+            console.log('雪碧图已加载');
             if (canvasManager) canvasManager.draw();
         });
     }
