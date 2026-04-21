@@ -237,7 +237,7 @@ body {
     width: 24px;
     height: 24px;
     margin: 0 auto 6px;
-    background-image: url('https://cdn.jsdelivr.net/gh/zhang1394725324/Rhino-gh-kangaroo-docs@main/img/sprites/kangaroo_icons.png');
+    background-image: url('https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png');
     background-repeat: no-repeat;
     background-size: 240px 264px;
     display: block;
