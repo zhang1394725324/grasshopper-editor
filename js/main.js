@@ -7,6 +7,7 @@ let groupsList = [];
 
 window.dragData = dragData;
 
+// JSON 文件路径 - 请确认这个链接在浏览器中能打开
 const JSON_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json';
 
 const GROUP_ORDER = [
@@ -44,11 +45,15 @@ const groupDisplayNamesEn = {
 
 // 提取输入端口名称
 function extractInputs(item) {
+    console.log(`🔍 提取 ${item.name} 的输入端口:`, item.parameters);
+    
     if (item.parameters && Array.isArray(item.parameters)) {
-        return item.parameters.map(p => {
+        const result = item.parameters.map(p => {
             if (typeof p === 'object' && p.name) return p.name;
             return p;
         });
+        console.log(`   输入结果:`, result);
+        return result;
     }
     if (item.inputs && Array.isArray(item.inputs)) {
         return item.inputs;
@@ -58,11 +63,15 @@ function extractInputs(item) {
 
 // 提取输出端口名称
 function extractOutputs(item) {
+    console.log(`🔍 提取 ${item.name} 的输出端口:`, item.outputs);
+    
     if (item.outputs && Array.isArray(item.outputs)) {
-        return item.outputs.map(o => {
+        const result = item.outputs.map(o => {
             if (typeof o === 'object' && o.name) return o.name;
             return o;
         });
+        console.log(`   输出结果:`, result);
+        return result;
     }
     return [];
 }
@@ -73,25 +82,33 @@ function loadComponentsData() {
     
     container.innerHTML = '<div style="color: #888; text-align: center; padding: 40px;"><i class="fas fa-spinner fa-pulse"></i> 加载组件数据中...</div>';
     
+    console.log('📡 开始加载 JSON 数据:', JSON_URL);
+    
     fetch(JSON_URL + '?t=' + Date.now())
         .then(res => {
+            console.log('📡 响应状态:', res.status);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
         })
         .then(data => {
-            console.log('✅ 组件数据加载成功', data);
+            console.log('✅ 组件数据加载成功');
+            console.log('📦 数据内容:', data);
+            
             componentsData = data;
             
             groupsList = GROUP_ORDER.filter(group => 
                 componentsData[group] && componentsData[group].length > 0
             );
             
+            console.log('📂 分组列表:', groupsList);
+            
             renderCategories();
         })
         .catch(err => {
             console.error('❌ 数据加载失败:', err);
             container.innerHTML = `<div style="color:#dc2626;text-align:center;padding:40px;">
-                <i class="fas fa-exclamation-triangle"></i> 数据加载失败: ${err.message}
+                <i class="fas fa-exclamation-triangle"></i> 数据加载失败: ${err.message}<br>
+                <small>请检查: ${JSON_URL}</small>
             </div>`;
         });
 }
@@ -107,6 +124,8 @@ function renderCategories() {
     groupsList.forEach(groupKey => {
         const items = componentsData[groupKey];
         if (!items || items.length === 0) return;
+        
+        console.log(`📁 渲染分组: ${groupKey}, 组件数: ${items.length}`);
         
         const itemCount = items.length;
         let columns = 2;
@@ -169,9 +188,10 @@ function createIconItem(item) {
     const outputs = extractOutputs(item);
     
     console.log(`📦 创建图标: ${item.name}`);
-    console.log(`   输入端口:`, inputs);
-    console.log(`   输出端口:`, outputs);
+    console.log(`   输入端口数量: ${inputs.length}, 内容:`, inputs);
+    console.log(`   输出端口数量: ${outputs.length}, 内容:`, outputs);
     
+    // 存储到 dataset
     iconItem.dataset.componentName = item.name;
     iconItem.dataset.componentInputs = JSON.stringify(inputs);
     iconItem.dataset.componentOutputs = JSON.stringify(outputs);
@@ -208,9 +228,11 @@ function createIconItem(item) {
         e.dataTransfer.setData('text/plain', JSON.stringify(componentData));
         e.dataTransfer.effectAllowed = 'copy';
         iconItem.style.opacity = '0.5';
-        console.log(`🚀 拖拽开始: ${componentData.name}`);
-        console.log(`   输入:`, componentData.inputs);
-        console.log(`   输出:`, componentData.outputs);
+        
+        console.log('🚀 ========== 拖拽开始 ==========');
+        console.log('   电池名称:', componentData.name);
+        console.log('   输入端口:', componentData.inputs);
+        console.log('   输出端口:', componentData.outputs);
     });
     
     iconItem.addEventListener('dragend', (e) => {
@@ -236,6 +258,7 @@ function setupCanvasDrop() {
         
         let componentData = null;
         
+        // 尝试多种方式获取数据
         try {
             const jsonData = e.dataTransfer.getData('text/plain');
             if (jsonData) {
@@ -251,13 +274,14 @@ function setupCanvasDrop() {
         }
         
         if (!componentData) {
-            console.warn('没有拖拽数据');
+            console.warn('❌ 没有拖拽数据');
             return;
         }
         
-        console.log(`📍 放置电池: ${componentData.name}`);
-        console.log(`   输入端口:`, componentData.inputs);
-        console.log(`   输出端口:`, componentData.outputs);
+        console.log('📍 ========== 放置电池 ==========');
+        console.log('   电池名称:', componentData.name);
+        console.log('   输入端口:', componentData.inputs);
+        console.log('   输出端口:', componentData.outputs);
         
         const rect = document.getElementById('canvas').getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
@@ -266,7 +290,7 @@ function setupCanvasDrop() {
         const canvasX = (mouseX - canvasManager.panOffset.x) / canvasManager.zoom;
         const canvasY = (mouseY - canvasManager.panOffset.y) / canvasManager.zoom;
         
-        // 创建电池，传入端口数组
+        // 创建电池
         const newComponent = new Component(
             generateId(),
             componentData.name,
@@ -275,6 +299,11 @@ function setupCanvasDrop() {
             componentData.inputs || [],
             componentData.outputs || []
         );
+        
+        console.log('🔋 创建的电池对象:');
+        console.log('   名称:', newComponent.name);
+        console.log('   输入端口数量:', newComponent.inputs.length);
+        console.log('   输出端口数量:', newComponent.outputs.length);
         
         newComponent.spriteX = componentData.spriteX;
         newComponent.spriteY = componentData.spriteY;
