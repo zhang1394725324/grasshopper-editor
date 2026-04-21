@@ -57,7 +57,49 @@ function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
-// 电池组件类（带图标支持）
+// ========== 雪碧图配置（跨项目引用）==========
+const SPRITE_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png';
+
+let spriteImage = null;
+let spriteImageLoaded = false;
+let spriteImageCallbacks = [];
+
+function loadSpriteImage(callback) {
+    if (spriteImageLoaded && spriteImage) {
+        if (callback) callback(spriteImage);
+        return;
+    }
+    
+    if (callback) spriteImageCallbacks.push(callback);
+    
+    if (!spriteImage) {
+        spriteImage = new Image();
+        spriteImage.crossOrigin = 'Anonymous';
+        spriteImage.onload = () => {
+            spriteImageLoaded = true;
+            spriteImageCallbacks.forEach(cb => cb(spriteImage));
+            spriteImageCallbacks = [];
+            console.log('✅ 雪碧图加载成功:', SPRITE_URL);
+        };
+        spriteImage.onerror = () => {
+            console.warn('⚠️ 雪碧图加载失败，将使用默认图标:', SPRITE_URL);
+            spriteImageLoaded = true;
+            spriteImageCallbacks.forEach(cb => cb(null));
+            spriteImageCallbacks = [];
+        };
+        spriteImage.src = SPRITE_URL;
+    }
+}
+
+function getSpriteImage() {
+    return spriteImage;
+}
+
+function isSpriteLoaded() {
+    return spriteImageLoaded && spriteImage && spriteImage.complete;
+}
+
+// ========== 电池组件类 ==========
 class Component {
     constructor(id, name, x, y, inputs = [], outputs = []) {
         this.id = id;
@@ -94,6 +136,9 @@ class Component {
         this.isSelected = false;
         this.dragOffsetX = 0;
         this.dragOffsetY = 0;
+        
+        // 根据端口数量调整高度
+        this.updateHeight();
     }
 
     // 添加输入端口
@@ -106,7 +151,6 @@ class Component {
             connectedTo: null
         };
         this.inputs.push(newInput);
-        // 重新计算高度（可选）
         this.updateHeight();
         return newInput;
     }
@@ -153,15 +197,15 @@ class Component {
     // 根据端口数量动态调整高度
     updateHeight() {
         const maxPorts = Math.max(this.inputs.length, this.outputs.length);
-        // 基础高度60 + 每个端口增加6px，最小70，最大140
-        this.height = Math.min(140, Math.max(70, 60 + maxPorts * 6));
+        // 基础高度70 + 每个端口增加6px，最小70，最大140
+        this.height = Math.min(140, Math.max(70, 70 + maxPorts * 5));
     }
 
     // 获取端口位置
     getPortPosition(port) {
         const totalPorts = port.position === 'left' ? this.inputs.length : this.outputs.length;
-        const portSpacing = (this.height - 20) / (totalPorts + 1);
-        const yOffset = 15 + portSpacing * (port.index + 1);
+        const portSpacing = (this.height - 25) / (totalPorts + 1);
+        const yOffset = 18 + portSpacing * (port.index + 1);
         
         return {
             x: this.x + (port.position === 'left' ? 0 : this.width),
@@ -173,7 +217,7 @@ class Component {
     getIconPosition() {
         return {
             x: this.x + this.width / 2,
-            y: this.y + 28
+            y: this.y + 32
         };
     }
     
@@ -186,7 +230,7 @@ class Component {
     }
 }
 
-// 连接线类
+// ========== 连接线类 ==========
 class Connection {
     constructor(id, fromComponentId, fromPortId, toComponentId, toPortId) {
         this.id = id;
@@ -197,7 +241,7 @@ class Connection {
     }
 }
 
-// 历史记录条目
+// ========== 历史记录条目 ==========
 class HistoryEntry {
     constructor(components, connections, action) {
         this.components = JSON.parse(JSON.stringify(components));
@@ -207,7 +251,7 @@ class HistoryEntry {
     }
 }
 
-// 预设颜色
+// ========== 预设颜色 ==========
 const presetColors = [
     '#2d2d2d',  // 默认灰
     '#4caf50',  // 绿色
@@ -223,53 +267,67 @@ const presetColors = [
 
 // 获取电池类型对应的默认颜色
 function getComponentColorByName(name) {
-    if (name.includes('Solver') || name.includes('solver')) return '#4caf50';
-    if (name.includes('Anchor') || name.includes('anchor')) return '#2196f3';
-    if (name.includes('Spring') || name.includes('spring')) return '#ff9800';
-    if (name.includes('Gravity') || name.includes('gravity')) return '#9c27b0';
-    if (name.includes('Wind') || name.includes('wind')) return '#00bcd4';
-    if (name.includes('Collide') || name.includes('collide')) return '#f44336';
-    if (name.includes('Display') || name.includes('display')) return '#e91e63';
-    if (name.includes('Slider') || name.includes('slider')) return '#ffc107';
-    if (name.includes('List') || name.includes('list')) return '#607d8b';
+    if (!name) return '#2d2d2d';
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('solver')) return '#4caf50';
+    if (lowerName.includes('anchor')) return '#2196f3';
+    if (lowerName.includes('spring')) return '#ff9800';
+    if (lowerName.includes('gravity')) return '#9c27b0';
+    if (lowerName.includes('wind')) return '#00bcd4';
+    if (lowerName.includes('collide')) return '#f44336';
+    if (lowerName.includes('display')) return '#e91e63';
+    if (lowerName.includes('slider')) return '#ffc107';
+    if (lowerName.includes('list')) return '#607d8b';
     return '#2d2d2d';
 }
 
-// 加载雪碧图（单例模式）
-let spriteImage = null;
-let spriteImageLoaded = false;
-let spriteImageCallbacks = [];
+// ========== 导出组件绘制辅助函数（供 canvas.js 使用）=========
+// 注意：实际绘制在 canvas.js 中完成，这里只提供数据结构和工具函数
 
-function loadSpriteImage(callback) {
-    if (spriteImageLoaded && spriteImage) {
-        if (callback) callback(spriteImage);
-        return;
-    }
-    
-    if (callback) spriteImageCallbacks.push(callback);
-    
-    if (!spriteImage) {
-        spriteImage = new Image();
-        spriteImage.onload = () => {
-            spriteImageLoaded = true;
-            spriteImageCallbacks.forEach(cb => cb(spriteImage));
-            spriteImageCallbacks = [];
-        };
-        spriteImage.onerror = () => {
-            console.warn('雪碧图加载失败，将使用默认图标');
-            spriteImageLoaded = true;
-            spriteImageCallbacks.forEach(cb => cb(null));
-            spriteImageCallbacks = [];
-        };
-        // 尝试加载雪碧图
-        spriteImage.src = 'https://cdn.jsdelivr.net/gh/zhang1394725324/Rhino-gh-kangaroo-docs@main/img/sprites/kangaroo_icons.png';
-    }
+// 预加载雪碧图（在页面加载时调用）
+function preloadSprite() {
+    loadSpriteImage(() => {
+        console.log('雪碧图预加载完成');
+    });
 }
 
-function getSpriteImage() {
-    return spriteImage;
+// 在 canvas 上绘制电池图标（供 canvas.js 调用）
+function drawComponentIcon(ctx, component, x, y, size = 24) {
+    const iconX = x - size / 2;
+    const iconY = y - size / 2;
+    
+    // 如果有雪碧图坐标且雪碧图已加载，绘制雪碧图
+    if (component.spriteX !== null && component.spriteY !== null && spriteImage && spriteImage.complete) {
+        try {
+            ctx.drawImage(
+                spriteImage,
+                component.spriteX, component.spriteY, size, size,
+                iconX, iconY, size, size
+            );
+            return true;
+        } catch (e) {
+            console.warn('绘制雪碧图失败:', e);
+        }
+    }
+    
+    // 降级方案：绘制默认图标
+    ctx.fillStyle = '#555';
+    ctx.fillRect(iconX, iconY, size, size);
+    ctx.fillStyle = '#888';
+    ctx.font = '12px monospace';
+    ctx.fillText('🦘', iconX + 6, iconY + 18);
+    
+    return false;
 }
 
-function isSpriteLoaded() {
-    return spriteImageLoaded && spriteImage && spriteImage.complete;
+// 导出初始化函数
+function initComponents() {
+    preloadSprite();
+}
+
+// 如果需要在页面加载时自动初始化
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initComponents();
+    });
 }
