@@ -11,16 +11,21 @@
         <!-- 顶部工具栏 -->
         <div class="toolbar">
             <div class="toolbar-left">
-                <button id="clearCanvas" class="tool-btn">清空画布</button>
-                <button id="exportJson" class="tool-btn">导出 JSON</button>
-                <button id="importJson" class="tool-btn">导入 JSON</button>
+                <button id="undoBtn" class="tool-btn" title="撤销 (Ctrl+Z)">↩ 撤销</button>
+                <button id="redoBtn" class="tool-btn" title="重做 (Ctrl+Y)">↪ 重做</button>
+                <div class="toolbar-divider"></div>
+                <button id="clearCanvas" class="tool-btn">🗑 清空画布</button>
+                <button id="exportJson" class="tool-btn">📤 导出 JSON</button>
+                <button id="importJson" class="tool-btn">📥 导入 JSON</button>
                 <input type="file" id="importFile" accept=".json" style="display: none;">
             </div>
             <div class="toolbar-center">
-                <span class="zoom-info">缩放: <span id="zoomLevel">100</span>%</span>
+                <span class="zoom-info">🔍 缩放: <span id="zoomLevel">100</span>%</span>
+                <button id="zoomFit" class="tool-btn-small">适应画布</button>
             </div>
             <div class="toolbar-right">
-                <span class="status" id="status">就绪</span>
+                <button id="showHelp" class="tool-btn">❓ 操作说明</button>
+                <span class="status" id="status">✅ 就绪</span>
             </div>
         </div>
 
@@ -32,8 +37,8 @@
                     <h3>📦 Kangaroo2 电池库</h3>
                     <button id="addCustomComponent" class="icon-btn" title="添加自定义电池">+</button>
                 </div>
+                <input type="text" id="librarySearch" class="library-search" placeholder="🔍 搜索电池...">
                 <div class="library-items" id="componentLibrary">
-                    <!-- 电池将动态生成 -->
                     <div style="color: #888; text-align: center; padding: 20px;">加载中...</div>
                 </div>
             </div>
@@ -43,13 +48,81 @@
                 <canvas id="canvas" class="canvas"></canvas>
                 <!-- 右键菜单 -->
                 <div class="context-menu" id="contextMenu" style="display: none;">
-                    <div class="context-item" data-action="delete">🗑️ 删除电池</div>
+                    <div class="context-item" data-action="delete">🗑️ 删除</div>
                     <div class="context-item" data-action="rename">✏️ 重命名</div>
-                    <div class="context-item" data-action="addInput">➕ 添加输入端口</div>
-                    <div class="context-item" data-action="addOutput">➕ 添加输出端口</div>
+                    <div class="context-item" data-action="addInput">➕ 添加输入</div>
+                    <div class="context-item" data-action="addOutput">➕ 添加输出</div>
                     <div class="context-divider"></div>
                     <div class="context-item" data-action="duplicate">📋 复制</div>
+                    <div class="context-item" data-action="color">🎨 设置颜色</div>
                 </div>
+                
+                <!-- 连接线右键菜单 -->
+                <div class="context-menu" id="connectionMenu" style="display: none;">
+                    <div class="context-item" data-action="deleteConnection">🔌 断开连接</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作说明模态框 -->
+    <div id="helpModal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <h3>📖 操作说明</h3>
+            <div class="help-content">
+                <div class="help-section">
+                    <h4>🖱️ 基础操作</h4>
+                    <ul>
+                        <li><strong>添加电池</strong>：从左侧电池库拖拽到画布</li>
+                        <li><strong>移动电池</strong>：鼠标拖拽电池主体</li>
+                        <li><strong>连接电池</strong>：从一个端口拖拽到另一个端口</li>
+                        <li><strong>断开连接</strong>：右键点击连接线 → 断开连接</li>
+                        <li><strong>删除电池</strong>：右键点击电池 → 删除 / 按 Delete 键</li>
+                        <li><strong>重命名电池</strong>：右键点击电池 → 重命名</li>
+                        <li><strong>复制电池</strong>：右键点击电池 → 复制 / Ctrl+D</li>
+                        <li><strong>框选多个</strong>：按住 Shift + 鼠标拖拽框选</li>
+                        <li><strong>批量移动</strong>：框选后拖拽任意一个选中的电池</li>
+                    </ul>
+                </div>
+                <div class="help-section">
+                    <h4>🎨 电池定制</h4>
+                    <ul>
+                        <li><strong>添加端口</strong>：右键 → 添加输入/输出端口</li>
+                        <li><strong>设置颜色</strong>：右键 → 设置颜色</li>
+                        <li><strong>自定义电池</strong>：点击左侧库的 + 按钮创建新电池模板</li>
+                    </ul>
+                </div>
+                <div class="help-section">
+                    <h4>📐 画布控制</h4>
+                    <ul>
+                        <li><strong>缩放</strong>：鼠标滚轮</li>
+                        <li><strong>平移</strong>：鼠标中键/右键拖拽</li>
+                        <li><strong>适应画布</strong>：点击工具栏"适应画布"按钮</li>
+                    </ul>
+                </div>
+                <div class="help-section">
+                    <h4>⌨️ 快捷键</h4>
+                    <ul>
+                        <li><strong>Ctrl+Z</strong> - 撤销</li>
+                        <li><strong>Ctrl+Y / Ctrl+Shift+Z</strong> - 重做</li>
+                        <li><strong>Delete</strong> - 删除选中</li>
+                        <li><strong>Ctrl+D</strong> - 复制选中</li>
+                        <li><strong>Ctrl+A</strong> - 全选</li>
+                        <li><strong>Esc</strong> - 取消选择</li>
+                        <li><strong>Shift+拖拽</strong> - 框选多个</li>
+                    </ul>
+                </div>
+                <div class="help-section">
+                    <h4>💾 文件操作</h4>
+                    <ul>
+                        <li><strong>导出 JSON</strong>：保存当前工作到文件</li>
+                        <li><strong>导入 JSON</strong>：从文件恢复工作</li>
+                        <li><strong>清空画布</strong>：删除所有电池和连接</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button id="closeHelpBtn">关闭</button>
             </div>
         </div>
     </div>
