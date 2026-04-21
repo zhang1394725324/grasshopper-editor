@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <title>Kangaroo2 电池编辑器 - Grasshopper 风格</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部工具栏 -->
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <div class="logo-area">
+                    <h1>🦘 Kangaroo2</h1>
+                    <span class="subtitle">电池编辑器</span>
+                </div>
+                <div class="toolbar-divider"></div>
+                <button id="undoBtn" class="tool-btn" title="撤销 (Ctrl+Z)"><i class="fas fa-undo"></i> 撤销</button>
+                <button id="redoBtn" class="tool-btn" title="重做 (Ctrl+Y)"><i class="fas fa-redo"></i> 重做</button>
+                <button id="clearCanvas" class="tool-btn"><i class="fas fa-trash"></i> 清空</button>
+                <button id="exportJson" class="tool-btn"><i class="fas fa-download"></i> 导出</button>
+                <button id="importJson" class="tool-btn"><i class="fas fa-upload"></i> 导入</button>
+                <input type="file" id="importFile" accept=".json" style="display: none;">
+            </div>
+            <div class="toolbar-center">
+                <span class="zoom-info"><i class="fas fa-search-plus"></i> <span id="zoomLevel">100</span>%</span>
+                <button id="zoomFit" class="tool-btn-small"><i class="fas fa-expand"></i> 适应</button>
+            </div>
+            <div class="toolbar-right">
+                <button id="langBtn" class="lang-switch">EN</button>
+                <button id="showHelp" class="tool-btn-small"><i class="fas fa-question-circle"></i> 帮助</button>
+                <span class="status" id="status"><i class="fas fa-check-circle"></i> 就绪</span>
+            </div>
+        </div>
+
+        <!-- 主体区域 -->
+        <div class="main-content">
+            <!-- 左侧电池库（卡片风格） -->
+            <div class="component-library">
+                <div class="library-header">
+                    <h3><i class="fas fa-puzzle-piece"></i> 电池库</h3>
+                    <button id="addCustomComponent" class="icon-btn" title="添加自定义电池"><i class="fas fa-plus"></i></button>
+                </div>
+                <input type="text" id="librarySearch" class="library-search" placeholder="🔍 搜索电池...">
+                <div class="categories-container" id="categoriesContainer">
+                    <!-- 分类卡片将动态生成 -->
+                    <div style="color: #888; text-align: center; padding: 40px;">加载组件数据中...</div>
+                </div>
+            </div>
+
+            <!-- 右侧画布区域 -->
+            <div class="canvas-container">
+                <canvas id="canvas" class="canvas"></canvas>
+                <!-- 右键菜单 -->
+                <div class="context-menu" id="contextMenu" style="display: none;">
+                    <div class="context-item" data-action="delete"><i class="fas fa-trash"></i> 删除</div>
+                    <div class="context-item" data-action="rename"><i class="fas fa-edit"></i> 重命名</div>
+                    <div class="context-item" data-action="addInput"><i class="fas fa-plus-circle"></i> 添加输入</div>
+                    <div class="context-item" data-action="addOutput"><i class="fas fa-plus-circle"></i> 添加输出</div>
+                    <div class="context-divider"></div>
+                    <div class="context-item" data-action="duplicate"><i class="fas fa-copy"></i> 复制</div>
+                    <div class="context-item" data-action="color"><i class="fas fa-palette"></i> 设置颜色</div>
+                </div>
+                <div class="context-menu" id="connectionMenu" style="display: none;">
+                    <div class="context-item" data-action="deleteConnection"><i class="fas fa-plug"></i> 断开连接</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 帮助模态框 -->
+        <div id="helpModal" class="modal" style="display: none;">
+            <div class="modal-content modal-large">
+                <h3><i class="fas fa-question-circle"></i> 操作说明</h3>
+                <div class="help-content">
+                    <div class="help-section">
+                        <h4><i class="fas fa-mouse-pointer"></i> 基础操作</h4>
+                        <ul>
+                            <li><strong>添加电池</strong>：从左侧电池库拖拽到画布</li>
+                            <li><strong>移动电池</strong>：鼠标拖拽电池主体</li>
+                            <li><strong>连接电池</strong>：从一个端口拖拽到另一个端口</li>
+                            <li><strong>断开连接</strong>：右键点击连接线 → 断开连接</li>
+                            <li><strong>删除电池</strong>：右键 → 删除 / 按 Delete 键</li>
+                        </ul>
+                    </div>
+                    <div class="help-section">
+                        <h4><i class="fas fa-vector-square"></i> 框选与多选</h4>
+                        <ul>
+                            <li><strong>框选多个</strong>：按住 Shift + 鼠标拖拽</li>
+                            <li><strong>批量移动</strong>：框选后拖拽任意选中电池</li>
+                            <li><strong>全选</strong>：Ctrl + A</li>
+                            <li><strong>取消选择</strong>：Esc</li>
+                        </ul>
+                    </div>
+                    <div class="help-section">
+                        <h4><i class="fas fa-cog"></i> 电池定制</h4>
+                        <ul>
+                            <li><strong>重命名</strong>：右键 → 重命名</li>
+                            <li><strong>添加端口</strong>：右键 → 添加输入/输出</li>
+                            <li><strong>设置颜色</strong>：右键 → 设置颜色</li>
+                            <li><strong>复制电池</strong>：右键 → 复制 / Ctrl+D</li>
+                        </ul>
+                    </div>
+                    <div class="help-section">
+                        <h4><i class="fas fa-hand-paper"></i> 画布控制</h4>
+                        <ul>
+                            <li><strong>缩放</strong>：鼠标滚轮</li>
+                            <li><strong>平移</strong>：鼠标中键/右键拖拽</li>
+                            <li><strong>适应画布</strong>：点击适应按钮</li>
+                        </ul>
+                    </div>
+                    <div class="help-section">
+                        <h4><i class="fas fa-keyboard"></i> 快捷键</h4>
+                        <ul>
+                            <li><strong>Ctrl+Z</strong> - 撤销</li>
+                            <li><strong>Ctrl+Y</strong> - 重做</li>
+                            <li><strong>Delete</strong> - 删除</li>
+                            <li><strong>Ctrl+D</strong> - 复制</li>
+                            <li><strong>Ctrl+A</strong> - 全选</li>
+                        </ul>
+                    </div>
+                    <div class="help-section">
+                        <h4><i class="fas fa-save"></i> 文件操作</h4>
+                        <ul>
+                            <li><strong>导出 JSON</strong>：保存当前工作</li>
+                            <li><strong>导入 JSON</strong>：恢复工作</li>
+                            <li><strong>清空画布</strong>：删除所有内容</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-buttons">
+                    <button id="closeHelpBtn"><i class="fas fa-times"></i> 关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/components.js"></script>
+    <script src="js/canvas.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
