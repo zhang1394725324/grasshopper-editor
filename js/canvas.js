@@ -16,6 +16,11 @@ class CanvasManager {
         this.isPanning = false;
         this.panStart = { x: 0, y: 0 };
         
+        // 触摸状态（移动端）
+        this.touchStartDistance = 0;
+        this.touchStartZoom = 1;
+        this.isTouchPinching = false;
+        
         // 连接状态
         this.isConnecting = false;
         this.connectingFrom = null;
@@ -40,14 +45,110 @@ class CanvasManager {
     }
     
     initEvents() {
+        // 鼠标事件
         this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
         this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
         this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
         this.canvas.addEventListener('wheel', this.onWheel.bind(this));
         this.canvas.addEventListener('contextmenu', this.onContextMenu.bind(this));
+        
+        // 触摸事件（移动端）
+        this.canvas.addEventListener('touchstart', this.onTouchStart.bind(this));
+        this.canvas.addEventListener('touchmove', this.onTouchMove.bind(this));
+        this.canvas.addEventListener('touchend', this.onTouchEnd.bind(this));
+        
         window.addEventListener('resize', this.resize.bind(this));
     }
     
+    // ========== 移动端触摸处理 ==========
+    onTouchStart(e) {
+        e.preventDefault();
+        const rect = this.canvas.getBoundingClientRect();
+        const touches = e.touches;
+        
+        if (touches.length === 1) {
+            // 单指：拖拽或点击
+            const touch = touches[0];
+            const x = (touch.clientX - rect.left - this.panOffset.x) / this.zoom;
+            const y = (touch.clientY - rect.top - this.panOffset.y) / this.zoom;
+            
+            // 模拟鼠标按下
+            const fakeEvent = { clientX: touch.clientX, clientY: touch.clientY, button: 0 };
+            this.onMouseDown(fakeEvent);
+            
+            this.lastTouchX = touch.clientX;
+            this.lastTouchY = touch.clientY;
+            this.isTouching = true;
+            
+        } else if (touches.length === 2) {
+            // 双指：缩放
+            this.isTouchPinching = true;
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            this.touchStartDistance = Math.hypot(dx, dy);
+            this.touchStartZoom = this.zoom;
+        }
+    }
+    
+    onTouchMove(e) {
+        e.preventDefault();
+        const rect = this.canvas.getBoundingClientRect();
+        const touches = e.touches;
+        
+        if (touches.length === 1 && this.isTouching && !this.isTouchPinching) {
+            // 单指平移
+            const touch = touches[0];
+            const dx = touch.clientX - this.lastTouchX;
+            const dy = touch.clientY - this.lastTouchY;
+            
+            this.panOffset.x += dx;
+            this.panOffset.y += dy;
+            
+            this.lastTouchX = touch.clientX;
+            this.lastTouchY = touch.clientY;
+            this.draw();
+            
+        } else if (touches.length === 2 && this.isTouchPinching) {
+            // 双指缩放
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            const currentDistance = Math.hypot(dx, dy);
+            
+            if (this.touchStartDistance > 0) {
+                const scale = currentDistance / this.touchStartDistance;
+                let newZoom = this.touchStartZoom * scale;
+                newZoom = Math.min(2, Math.max(0.5, newZoom));
+                
+                if (newZoom !== this.zoom) {
+                    // 以触摸点中心缩放
+                    const centerX = (touches[0].clientX + touches[1].clientX) / 2;
+                    const centerY = (touches[0].clientY + touches[1].clientY) / 2;
+                    
+                    const zoomFactor = newZoom / this.zoom;
+                    this.panOffset.x = centerX - (centerX - this.panOffset.x) * zoomFactor;
+                    this.panOffset.y = centerY - (centerY - this.panOffset.y) * zoomFactor;
+                    this.zoom = newZoom;
+                    
+                    const zoomLevel = document.getElementById('zoomLevel');
+                    if (zoomLevel) zoomLevel.textContent = Math.round(this.zoom * 100);
+                    this.draw();
+                }
+            }
+        }
+    }
+    
+    onTouchEnd(e) {
+        e.preventDefault();
+        this.isTouching = false;
+        this.isTouchPinching = false;
+        this.isPanning = false;
+        
+        // 模拟鼠标松开
+        const fakeEvent = { button: 0 };
+        this.onMouseUp(fakeEvent);
+    }
+    
+    // ========== 原有鼠标事件保持不变 ==========
     saveToHistory(action) {
         if (this.historyIndex < this.history.length - 1) {
             this.history = this.history.slice(0, this.historyIndex + 1);
@@ -99,7 +200,7 @@ class CanvasManager {
         for (const c of entry.components) {
             const comp = new Component(c.id, c.name, c.x, c.y, 
                 c.inputs.map(i => i.name), c.outputs.map(o => o.name));
-            comp.color = c.color || '#2d2d2d';
+            comp.color = c.color || '#3a6ea5';
             comp.spriteX = c.spriteX;
             comp.spriteY = c.spriteY;
             this.components.set(comp.id, comp);
@@ -186,9 +287,19 @@ class CanvasManager {
     
     getMousePos(e) {
         const rect = this.canvas.getBoundingClientRect();
+        let clientX, clientY;
+        
+        if (e.touches) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        
         return {
-            x: (e.clientX - rect.left - this.panOffset.x) / this.zoom,
-            y: (e.clientY - rect.top - this.panOffset.y) / this.zoom
+            x: (clientX - rect.left - this.panOffset.x) / this.zoom,
+            y: (clientY - rect.top - this.panOffset.y) / this.zoom
         };
     }
     
@@ -439,13 +550,13 @@ class CanvasManager {
         for (const component of this.components.values()) {
             for (const input of component.inputs) {
                 const pos = component.getPortPosition(input);
-                if (Math.hypot(x - pos.x, y - pos.y) < 8) {
+                if (Math.hypot(x - pos.x, y - pos.y) < 10) {
                     return { componentId: component.id, portId: input.id, port: input, type: 'input' };
                 }
             }
             for (const output of component.outputs) {
                 const pos = component.getPortPosition(output);
-                if (Math.hypot(x - pos.x, y - pos.y) < 8) {
+                if (Math.hypot(x - pos.x, y - pos.y) < 10) {
                     return { componentId: component.id, portId: output.id, port: output, type: 'output' };
                 }
             }
@@ -679,19 +790,21 @@ class CanvasManager {
         const isSelected = this.selectedComponents.has(component);
         const borderColor = isSelected ? '#ffaa00' : '#555';
         
-        this.ctx.fillStyle = component.color || '#2d2d2d';
+        this.ctx.fillStyle = component.color || '#3a6ea5';
         this.ctx.strokeStyle = borderColor;
         this.ctx.lineWidth = isSelected ? 2.5 : 1.5;
         
         this.ctx.fillRect(component.x, component.y, component.width, component.height);
         this.ctx.strokeRect(component.x, component.y, component.width, component.height);
         
-        // 电池名称
-        this.ctx.fillStyle = '#ffaa00';
-        this.ctx.font = 'bold 10px "Segoe UI", monospace';
-        this.ctx.fillText(component.name, component.x + 6, component.y + 14);
+        // 电池名称 - 居中对齐
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 11px "Segoe UI", monospace';
+        const textWidth = this.ctx.measureText(component.name).width;
+        const textX = component.x + (component.width - textWidth) / 2;
+        this.ctx.fillText(component.name, textX, component.y + 16);
         
-        // 图标 - 24x24
+        // 图标
         const iconPos = component.getIconPosition();
         this.drawComponentIcon(component, iconPos.x, iconPos.y, 24);
         
@@ -699,19 +812,19 @@ class CanvasManager {
         component.inputs.forEach((input) => {
             const pos = component.getPortPosition(input);
             this.drawPort(pos.x, pos.y, '#4caf50', input.connectedTo ? '#8bc34a' : '#4caf50');
-            this.ctx.fillStyle = '#aaa';
-            this.ctx.font = '8px monospace';
-            this.ctx.fillText(input.name, pos.x + 7, pos.y + 3);
+            this.ctx.fillStyle = '#ddd';
+            this.ctx.font = '9px monospace';
+            this.ctx.fillText(input.name, pos.x + 8, pos.y + 3);
         });
         
         // 输出端口
         component.outputs.forEach((output) => {
             const pos = component.getPortPosition(output);
             this.drawPort(pos.x, pos.y, '#ff9800', output.connectedTo ? '#ffc107' : '#ff9800');
-            this.ctx.fillStyle = '#aaa';
-            this.ctx.font = '8px monospace';
+            this.ctx.fillStyle = '#ddd';
+            this.ctx.font = '9px monospace';
             const textWidth = this.ctx.measureText(output.name).width;
-            this.ctx.fillText(output.name, pos.x - 6 - textWidth, pos.y + 3);
+            this.ctx.fillText(output.name, pos.x - 7 - textWidth, pos.y + 3);
         });
     }
     
@@ -729,22 +842,20 @@ class CanvasManager {
                     iconX, iconY, size, size
                 );
                 return;
-            } catch (e) {
-                console.warn('绘制雪碧图失败:', e);
-            }
+            } catch (e) {}
         }
         
         // 降级默认图标
-        this.ctx.fillStyle = '#555';
+        this.ctx.fillStyle = '#2a5e95';
         this.ctx.fillRect(iconX, iconY, size, size);
-        this.ctx.fillStyle = '#888';
+        this.ctx.fillStyle = '#fff';
         this.ctx.font = '14px monospace';
-        this.ctx.fillText('🦘', iconX + 6, iconY + 18);
+        this.ctx.fillText('⚡', iconX + 7, iconY + 18);
     }
     
     drawPort(x, y, color, fillColor) {
         this.ctx.beginPath();
-        this.ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        this.ctx.arc(x, y, 5, 0, 2 * Math.PI);
         this.ctx.fillStyle = fillColor;
         this.ctx.fill();
         this.ctx.strokeStyle = color;
@@ -809,7 +920,7 @@ class CanvasManager {
             this.ctx.lineWidth = 1.5;
             this.ctx.setLineDash([5, 5]);
         } else {
-            this.ctx.strokeStyle = isHovered ? '#ffaa00' : '#888';
+            this.ctx.strokeStyle = isHovered ? '#ffaa00' : '#ffaa00';
             this.ctx.lineWidth = isHovered ? 3 : 2;
             this.ctx.setLineDash([]);
         }
@@ -953,7 +1064,7 @@ class CanvasManager {
         for (const compData of data.components || []) {
             const component = new Component(compData.id, compData.name, compData.x, compData.y,
                 compData.inputs || [], compData.outputs || []);
-            component.color = compData.color || '#2d2d2d';
+            component.color = compData.color || '#3a6ea5';
             component.spriteX = compData.spriteX;
             component.spriteY = compData.spriteY;
             this.components.set(component.id, component);
