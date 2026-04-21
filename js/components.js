@@ -262,7 +262,7 @@ function loadSpriteImage(callback) {
             spriteImageCallbacks = [];
         };
         // 尝试加载雪碧图
-        spriteImage.src = 'img/sprites/kangaroo_icons.png';
+        spriteImage.src = 'https://cdn.jsdelivr.net/gh/zhang1394725324/Rhino-gh-kangaroo-docs@main/img/sprites/kangaroo_icons.png';
     }
 }
 
