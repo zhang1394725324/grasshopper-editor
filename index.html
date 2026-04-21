@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Grasshopper 风格电池编辑器</title>
+    <title>Grasshopper 风格电池编辑器 - Kangaroo2</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -29,11 +29,12 @@
             <!-- 左侧电池库 -->
             <div class="component-library">
                 <div class="library-header">
-                    <h3>电池库</h3>
+                    <h3>📦 Kangaroo2 电池库</h3>
                     <button id="addCustomComponent" class="icon-btn" title="添加自定义电池">+</button>
                 </div>
                 <div class="library-items" id="componentLibrary">
-                    <!-- 预设电池组件将动态生成 -->
+                    <!-- 电池将动态生成 -->
+                    <div style="color: #888; text-align: center; padding: 20px;">加载中...</div>
                 </div>
             </div>
 
@@ -42,12 +43,12 @@
                 <canvas id="canvas" class="canvas"></canvas>
                 <!-- 右键菜单 -->
                 <div class="context-menu" id="contextMenu" style="display: none;">
-                    <div class="context-item" data-action="delete">删除电池</div>
-                    <div class="context-item" data-action="rename">重命名</div>
-                    <div class="context-item" data-action="addInput">添加输入端口</div>
-                    <div class="context-item" data-action="addOutput">添加输出端口</div>
+                    <div class="context-item" data-action="delete">🗑️ 删除电池</div>
+                    <div class="context-item" data-action="rename">✏️ 重命名</div>
+                    <div class="context-item" data-action="addInput">➕ 添加输入端口</div>
+                    <div class="context-item" data-action="addOutput">➕ 添加输出端口</div>
                     <div class="context-divider"></div>
-                    <div class="context-item" data-action="duplicate">复制</div>
+                    <div class="context-item" data-action="duplicate">📋 复制</div>
                 </div>
             </div>
         </div>
