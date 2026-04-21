@@ -44,6 +44,13 @@ function t(key) {
 
 function setLanguage(lang) {
     currentLanguage = lang;
+    // 更新所有带 data-i18n 属性的元素
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[currentLanguage][key]) {
+            el.textContent = translations[currentLanguage][key];
+        }
+    });
 }
 
 // 生成唯一ID
@@ -51,58 +58,72 @@ function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
-// ========== 雪碧图配置 ==========
-const SPRITE_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png';
+// ========== 雪碧图缓存（多菜单支持）==========
+let spriteImages = {};
 
-let spriteImage = null;
-let spriteImageLoaded = false;
-let spriteImageCallbacks = [];
-
-function loadSpriteImage(callback) {
-    if (spriteImageLoaded && spriteImage) {
-        if (callback) callback(spriteImage);
+function loadSpriteForMenu(menuId, spriteUrl, callback) {
+    if (!spriteUrl) {
+        if (callback) callback(null);
         return;
     }
     
-    if (callback) spriteImageCallbacks.push(callback);
-    
-    if (!spriteImage) {
-        spriteImage = new Image();
-        spriteImage.crossOrigin = 'Anonymous';
-        spriteImage.onload = () => {
-            spriteImageLoaded = true;
-            spriteImageCallbacks.forEach(cb => cb(spriteImage));
-            spriteImageCallbacks = [];
-            console.log('✅ 雪碧图加载成功');
-        };
-        spriteImage.onerror = () => {
-            console.warn('⚠️ 雪碧图加载失败，将使用默认图标');
-            spriteImageLoaded = true;
-            spriteImageCallbacks.forEach(cb => cb(null));
-            spriteImageCallbacks = [];
-        };
-        spriteImage.src = SPRITE_URL;
+    // 检查缓存
+    if (spriteImages[menuId] && spriteImages[menuId].complete) {
+        if (callback) callback(spriteImages[menuId]);
+        return;
     }
+    
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+        console.log(`✅ 雪碧图加载成功: ${menuId}`);
+        spriteImages[menuId] = img;
+        if (callback) callback(img);
+    };
+    img.onerror = () => {
+        console.warn(`⚠️ 雪碧图加载失败: ${menuId}`, spriteUrl);
+        spriteImages[menuId] = null;
+        if (callback) callback(null);
+    };
+    img.src = spriteUrl;
 }
 
-function getSpriteImage() {
-    return spriteImage;
+function getSpriteForMenu(menuId) {
+    return spriteImages[menuId] || null;
 }
 
-// ========== 电池组件类 ==========
+// ========== 电池组件类（支持调整大小）==========
 class Component {
     constructor(id, name, x, y, inputs = [], outputs = []) {
         this.id = id;
         this.name = name;
         this.x = x;
         this.y = y;
-        this.width = 150;
-        // 根据端口数量动态计算高度：基础高度70 + 每个端口增加10px间距
+        this.width = 160;
+        // 根据端口数量动态计算高度
         const maxPorts = Math.max(inputs.length, outputs.length);
-        this.height = Math.min(160, Math.max(80, 70 + maxPorts * 10));
-        this.color = '#3a6ea5'; // 统一蓝色主题
+        this.height = Math.min(200, Math.max(80, 70 + maxPorts * 12));
+        
+        // 尺寸限制
+        this.minWidth = 120;
+        this.minHeight = 70;
+        this.maxWidth = 350;
+        this.maxHeight = 280;
+        
+        this.color = '#3a6ea5';
         this.spriteX = null;
         this.spriteY = null;
+        this.menuId = 'kangaroo'; // 所属菜单，用于加载对应雪碧图
+        
+        // 调整大小状态
+        this.isResizing = false;
+        this.resizeEdge = null;
+        this.resizeStartX = 0;
+        this.resizeStartY = 0;
+        this.resizeStartWidth = 0;
+        this.resizeStartHeight = 0;
+        this.resizeStartXPos = 0;
+        this.resizeStartYPos = 0;
         
         // 输入端口
         this.inputs = [];
@@ -133,9 +154,10 @@ class Component {
         this.dragOffsetX = 0;
         this.dragOffsetY = 0;
         
-        console.log(`创建电池: ${name}, 输入: ${inputs.length}, 输出: ${outputs.length}, 高度: ${this.height}`);
+        console.log(`创建电池: ${name}, 输入: ${inputs.length}, 输出: ${outputs.length}, 尺寸: ${this.width}x${this.height}`);
     }
 
+    // 添加输入端口
     addInput(name) {
         const newInput = {
             id: `${this.id}_input_${this.inputs.length}`,
@@ -149,6 +171,7 @@ class Component {
         return newInput;
     }
 
+    // 添加输出端口
     addOutput(name) {
         const newOutput = {
             id: `${this.id}_output_${this.outputs.length}`,
@@ -162,14 +185,150 @@ class Component {
         return newOutput;
     }
 
-    updateHeight() {
-        const maxPorts = Math.max(this.inputs.length, this.outputs.length);
-        this.height = Math.min(160, Math.max(80, 70 + maxPorts * 10));
+    // 删除输入端口
+    removeInput(index) {
+        if (index >= 0 && index < this.inputs.length) {
+            this.inputs.splice(index, 1);
+            this.inputs.forEach((input, idx) => {
+                input.index = idx;
+                input.id = `${this.id}_input_${idx}`;
+            });
+            this.updateHeight();
+        }
     }
 
+    // 删除输出端口
+    removeOutput(index) {
+        if (index >= 0 && index < this.outputs.length) {
+            this.outputs.splice(index, 1);
+            this.outputs.forEach((output, idx) => {
+                output.index = idx;
+                output.id = `${this.id}_output_${idx}`;
+            });
+            this.updateHeight();
+        }
+    }
+
+    // 根据端口数量动态调整高度
+    updateHeight() {
+        const maxPorts = Math.max(this.inputs.length, this.outputs.length);
+        const newHeight = Math.min(this.maxHeight, Math.max(this.minHeight, 70 + maxPorts * 12));
+        if (newHeight !== this.height) {
+            this.height = newHeight;
+        }
+    }
+    
+    // 设置宽度
+    setWidth(newWidth) {
+        this.width = Math.min(this.maxWidth, Math.max(this.minWidth, newWidth));
+    }
+    
+    // 设置高度
+    setHeight(newHeight) {
+        this.height = Math.min(this.maxHeight, Math.max(this.minHeight, newHeight));
+    }
+    
+    // 检查点击是否在调整大小手柄上
+    hitResizeHandle(mouseX, mouseY, handleSize = 8) {
+        const handles = [
+            { edge: 'nw', x: this.x, y: this.y, cursor: 'nw-resize' },
+            { edge: 'n', x: this.x + this.width / 2, y: this.y, cursor: 'n-resize' },
+            { edge: 'ne', x: this.x + this.width, y: this.y, cursor: 'ne-resize' },
+            { edge: 'e', x: this.x + this.width, y: this.y + this.height / 2, cursor: 'e-resize' },
+            { edge: 'se', x: this.x + this.width, y: this.y + this.height, cursor: 'se-resize' },
+            { edge: 's', x: this.x + this.width / 2, y: this.y + this.height, cursor: 's-resize' },
+            { edge: 'sw', x: this.x, y: this.y + this.height, cursor: 'sw-resize' },
+            { edge: 'w', x: this.x, y: this.y + this.height / 2, cursor: 'w-resize' }
+        ];
+        
+        for (const handle of handles) {
+            if (Math.abs(mouseX - handle.x) <= handleSize && Math.abs(mouseY - handle.y) <= handleSize) {
+                return handle;
+            }
+        }
+        return null;
+    }
+    
+    // 开始调整大小
+    startResize(edge, mouseX, mouseY) {
+        this.isResizing = true;
+        this.resizeEdge = edge;
+        this.resizeStartX = mouseX;
+        this.resizeStartY = mouseY;
+        this.resizeStartWidth = this.width;
+        this.resizeStartHeight = this.height;
+        this.resizeStartXPos = this.x;
+        this.resizeStartYPos = this.y;
+    }
+    
+    // 调整大小
+    resize(mouseX, mouseY) {
+        if (!this.isResizing) return;
+        
+        const dx = mouseX - this.resizeStartX;
+        const dy = mouseY - this.resizeStartY;
+        let newWidth = this.resizeStartWidth;
+        let newHeight = this.resizeStartHeight;
+        let newX = this.resizeStartXPos;
+        let newY = this.resizeStartYPos;
+        
+        switch (this.resizeEdge) {
+            case 'nw':
+                newWidth = this.resizeStartWidth - dx;
+                newHeight = this.resizeStartHeight - dy;
+                newX = this.resizeStartXPos + dx;
+                newY = this.resizeStartYPos + dy;
+                break;
+            case 'n':
+                newHeight = this.resizeStartHeight - dy;
+                newY = this.resizeStartYPos + dy;
+                break;
+            case 'ne':
+                newWidth = this.resizeStartWidth + dx;
+                newHeight = this.resizeStartHeight - dy;
+                newY = this.resizeStartYPos + dy;
+                break;
+            case 'e':
+                newWidth = this.resizeStartWidth + dx;
+                break;
+            case 'se':
+                newWidth = this.resizeStartWidth + dx;
+                newHeight = this.resizeStartHeight + dy;
+                break;
+            case 's':
+                newHeight = this.resizeStartHeight + dy;
+                break;
+            case 'sw':
+                newWidth = this.resizeStartWidth - dx;
+                newHeight = this.resizeStartHeight + dy;
+                newX = this.resizeStartXPos + dx;
+                break;
+            case 'w':
+                newWidth = this.resizeStartWidth - dx;
+                newX = this.resizeStartXPos + dx;
+                break;
+        }
+        
+        // 应用边界限制
+        newWidth = Math.min(this.maxWidth, Math.max(this.minWidth, newWidth));
+        newHeight = Math.min(this.maxHeight, Math.max(this.minHeight, newHeight));
+        
+        // 防止位置超出边界（确保电池不超出画布可视区域）
+        if (newX !== this.x) this.x = newX;
+        if (newY !== this.y) this.y = newY;
+        if (newWidth !== this.width) this.width = newWidth;
+        if (newHeight !== this.height) this.height = newHeight;
+    }
+    
+    // 结束调整大小
+    endResize() {
+        this.isResizing = false;
+        this.resizeEdge = null;
+    }
+
+    // 获取端口位置
     getPortPosition(port) {
         const totalPorts = port.position === 'left' ? this.inputs.length : this.outputs.length;
-        // 端口间距加大：使用 height - 30 作为可用空间
         const availableHeight = this.height - 30;
         const portSpacing = availableHeight / (totalPorts + 1);
         const yOffset = 18 + portSpacing * (port.index + 1);
@@ -180,6 +339,7 @@ class Component {
         };
     }
     
+    // 获取图标位置
     getIconPosition() {
         return {
             x: this.x + this.width / 2,
@@ -187,13 +347,45 @@ class Component {
         };
     }
     
+    // 获取名称位置（居中）
     getNamePosition() {
-        // 名称居中
-        const textWidth = this.name.length * 6; // 估算宽度
         return {
-            x: this.x + (this.width - Math.min(textWidth, this.width - 10)) / 2,
+            x: this.x + this.width / 2,
             y: this.y + 16
         };
+    }
+    
+    // 转换为 JSON
+    toJSON() {
+        return {
+            id: this.id,
+            name: this.name,
+            x: this.x,
+            y: this.y,
+            width: this.width,
+            height: this.height,
+            color: this.color,
+            spriteX: this.spriteX,
+            spriteY: this.spriteY,
+            menuId: this.menuId,
+            inputs: this.inputs.map(i => i.name),
+            outputs: this.outputs.map(o => o.name)
+        };
+    }
+    
+    // 从 JSON 恢复
+    static fromJSON(data) {
+        const comp = new Component(
+            data.id, data.name, data.x, data.y,
+            data.inputs || [], data.outputs || []
+        );
+        if (data.width) comp.width = data.width;
+        if (data.height) comp.height = data.height;
+        if (data.color) comp.color = data.color;
+        if (data.spriteX) comp.spriteX = data.spriteX;
+        if (data.spriteY) comp.spriteY = data.spriteY;
+        if (data.menuId) comp.menuId = data.menuId;
+        return comp;
     }
 }
 
@@ -206,17 +398,74 @@ class Connection {
         this.toComponentId = toComponentId;
         this.toPortId = toPortId;
     }
+    
+    toJSON() {
+        return {
+            id: this.id,
+            fromComponentId: this.fromComponentId,
+            fromPortId: this.fromPortId,
+            toComponentId: this.toComponentId,
+            toPortId: this.toPortId
+        };
+    }
+    
+    static fromJSON(data) {
+        return new Connection(
+            data.id, data.fromComponentId, data.fromPortId,
+            data.toComponentId, data.toPortId
+        );
+    }
 }
 
-// ========== 预设颜色（统一使用蓝色）==========
+// ========== 历史记录条目 ==========
+class HistoryEntry {
+    constructor(components, connections, action) {
+        this.components = JSON.parse(JSON.stringify(components));
+        this.connections = JSON.parse(JSON.stringify(connections));
+        this.action = action;
+        this.timestamp = Date.now();
+    }
+}
+
+// ========== 预设颜色 ==========
 const presetColors = [
     '#3a6ea5',  // 默认蓝色
     '#4a7eb5',
     '#5a8ec5',
-    '#2a5e95'
+    '#2a5e95',
+    '#4caf50',  // 绿色
+    '#2196f3',  // 亮蓝
+    '#ff9800',  // 橙色
+    '#9c27b0',  // 紫色
+    '#f44336',  // 红色
+    '#00bcd4'   // 青色
 ];
 
-// 所有电池统一颜色
+// 获取电池类型对应的默认颜色（统一使用蓝色）
 function getComponentColorByName(name) {
-    return '#3a6ea5'; // 统一返回蓝色
+    // 所有电池统一使用蓝色主题
+    return '#3a6ea5';
+}
+
+// ========== 导出全局函数 ==========
+// 预加载雪碧图（供外部调用）
+function preloadSpriteForMenu(menuId, spriteUrl) {
+    loadSpriteForMenu(menuId, spriteUrl);
+}
+
+// 获取雪碧图
+function getSpriteImage(menuId) {
+    return getSpriteForMenu(menuId);
+}
+
+// 初始化组件模块
+function initComponents() {
+    console.log('🔧 组件模块初始化完成');
+}
+
+// 页面加载时自动初始化
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initComponents();
+    });
 }
