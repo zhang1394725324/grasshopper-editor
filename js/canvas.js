@@ -52,13 +52,13 @@ class CanvasManager {
     
     // 历史记录
     saveToHistory(action) {
-        // 如果当前不在历史末尾，删除之后的历史
         if (this.historyIndex < this.history.length - 1) {
             this.history = this.history.slice(0, this.historyIndex + 1);
         }
         
         const componentsData = Array.from(this.components.values()).map(c => ({
             id: c.id, name: c.name, x: c.x, y: c.y, color: c.color,
+            spriteX: c.spriteX, spriteY: c.spriteY,
             inputs: c.inputs.map(i => ({ id: i.id, name: i.name, index: i.index })),
             outputs: c.outputs.map(o => ({ id: o.id, name: o.name, index: o.index }))
         }));
@@ -103,7 +103,9 @@ class CanvasManager {
         for (const c of entry.components) {
             const comp = new Component(c.id, c.name, c.x, c.y, 
                 c.inputs.map(i => i.name), c.outputs.map(o => o.name));
-            comp.color = c.color || '#ffaa00';
+            comp.color = c.color || '#2d2d2d';
+            comp.spriteX = c.spriteX;
+            comp.spriteY = c.spriteY;
             this.components.set(comp.id, comp);
         }
         
@@ -137,10 +139,10 @@ class CanvasManager {
     updateStatus(message) {
         const status = document.getElementById('status');
         if (status) {
-            status.textContent = message;
+            status.innerHTML = `<i class="fas fa-info-circle"></i> ${message}`;
             setTimeout(() => {
-                if (status.textContent === message) {
-                    status.textContent = t('statusReady');
+                if (status.innerHTML === `<i class="fas fa-info-circle"></i> ${message}`) {
+                    status.innerHTML = `<i class="fas fa-check-circle"></i> ${t('statusReady')}`;
                 }
             }, 2000);
         }
@@ -182,7 +184,8 @@ class CanvasManager {
         this.panOffset.x = this.canvas.width / 2 - (minX + (maxX - minX) / 2 - padding) * this.zoom;
         this.panOffset.y = this.canvas.height / 2 - (minY + (maxY - minY) / 2 - padding) * this.zoom;
         
-        document.getElementById('zoomLevel').textContent = Math.round(this.zoom * 100);
+        const zoomLevel = document.getElementById('zoomLevel');
+        if (zoomLevel) zoomLevel.textContent = Math.round(this.zoom * 100);
         this.draw();
     }
     
@@ -571,14 +574,13 @@ class CanvasManager {
         if (this.selectedComponents.size === 0) return;
         
         const newComponents = [];
-        const oldToNewIds = new Map();
-        
         for (const comp of this.selectedComponents) {
             const newId = generateId();
-            oldToNewIds.set(comp.id, newId);
             const newComp = new Component(newId, comp.name, comp.x + 30, comp.y + 30,
                 comp.inputs.map(i => i.name), comp.outputs.map(o => o.name));
             newComp.color = comp.color;
+            newComp.spriteX = comp.spriteX;
+            newComp.spriteY = comp.spriteY;
             newComponents.push(newComp);
         }
         
@@ -659,33 +661,43 @@ class CanvasManager {
     }
     
     drawGrid() {
-        const gridSize = 20;
+        const gridSize = 30;
         const width = this.canvas.width / this.zoom;
         const height = this.canvas.height / this.zoom;
         const startX = -this.panOffset.x / this.zoom;
         const startY = -this.panOffset.y / this.zoom;
         
+        this.ctx.save();
         this.ctx.beginPath();
-        this.ctx.strokeStyle = '#2a2a2a';
-        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = '#3a3a3a';
+        this.ctx.lineWidth = 0.5;
         
-        for (let x = startX % gridSize; x < width; x += gridSize) {
+        // 绘制竖线
+        let firstX = ((startX % gridSize) + gridSize) % gridSize;
+        for (let x = firstX; x < width; x += gridSize) {
+            this.ctx.beginPath();
             this.ctx.moveTo(x, 0);
             this.ctx.lineTo(x, height);
+            this.ctx.stroke();
         }
         
-        for (let y = startY % gridSize; y < height; y += gridSize) {
+        // 绘制横线
+        let firstY = ((startY % gridSize) + gridSize) % gridSize;
+        for (let y = firstY; y < height; y += gridSize) {
+            this.ctx.beginPath();
             this.ctx.moveTo(0, y);
             this.ctx.lineTo(width, y);
+            this.ctx.stroke();
         }
         
-        this.ctx.stroke();
+        this.ctx.restore();
     }
     
     drawComponent(component) {
         const isSelected = this.selectedComponents.has(component);
-        const borderColor = isSelected ? '#ffaa00' : (this.hoverConnection ? '#888' : '#555');
+        const borderColor = isSelected ? '#ffaa00' : '#555';
         
+        // 背景
         this.ctx.fillStyle = component.color || '#2d2d2d';
         this.ctx.strokeStyle = borderColor;
         this.ctx.lineWidth = isSelected ? 2.5 : 1.5;
@@ -698,20 +710,9 @@ class CanvasManager {
         this.ctx.font = 'bold 10px "Segoe UI", monospace';
         this.ctx.fillText(component.name, component.x + 6, component.y + 14);
         
-        // 预留图标位置（电池名称下方，端口之间）
+        // 图标（中间）
         const iconPos = component.getIconPosition();
-        this.ctx.fillStyle = '#888';
-        this.ctx.font = '12px monospace';
-        if (component.icon) {
-            this.ctx.fillText(component.icon, iconPos.x - 6, iconPos.y + 4);
-        } else {
-            // 预留图标占位符
-            this.ctx.fillStyle = '#555';
-            this.ctx.fillRect(iconPos.x - 8, iconPos.y - 6, 16, 16);
-            this.ctx.fillStyle = '#888';
-            this.ctx.font = '8px monospace';
-            this.ctx.fillText('icon', iconPos.x - 5, iconPos.y + 2);
-        }
+        this.drawComponentIcon(component, iconPos.x, iconPos.y, 24);
         
         // 输入端口（左侧）
         component.inputs.forEach((input) => {
@@ -731,6 +732,34 @@ class CanvasManager {
             const textWidth = this.ctx.measureText(output.name).width;
             this.ctx.fillText(output.name, pos.x - 6 - textWidth, pos.y + 3);
         });
+    }
+    
+    drawComponentIcon(component, x, y, size = 24) {
+        const iconX = x - size / 2;
+        const iconY = y - size / 2;
+        
+        // 尝试获取雪碧图
+        const spriteImg = typeof getSpriteImage === 'function' ? getSpriteImage() : null;
+        
+        if (component.spriteX !== null && component.spriteY !== null && spriteImg && spriteImg.complete) {
+            try {
+                this.ctx.drawImage(
+                    spriteImg,
+                    component.spriteX, component.spriteY, size, size,
+                    iconX, iconY, size, size
+                );
+                return;
+            } catch (e) {
+                console.warn('绘制雪碧图失败:', e);
+            }
+        }
+        
+        // 降级：绘制默认图标
+        this.ctx.fillStyle = '#555';
+        this.ctx.fillRect(iconX, iconY, size, size);
+        this.ctx.fillStyle = '#888';
+        this.ctx.font = '14px monospace';
+        this.ctx.fillText('🦘', iconX + 6, iconY + 18);
     }
     
     drawPort(x, y, color, fillColor) {
@@ -832,7 +861,7 @@ class CanvasManager {
         menu.style.top = y + 'px';
         
         const handleClick = (e) => {
-            const action = e.target.dataset.action;
+            const action = e.target.closest('.context-item')?.dataset.action;
             if (action === 'delete') this.deleteSelectedComponents();
             else if (action === 'rename') this.showRenameDialog(component);
             else if (action === 'addInput') this.showAddPortDialog(component, 'input');
@@ -856,7 +885,7 @@ class CanvasManager {
         menu.style.top = y + 'px';
         
         const handleClick = (e) => {
-            if (e.target.dataset.action === 'deleteConnection') {
+            if (e.target.closest('.context-item')?.dataset.action === 'deleteConnection') {
                 this.deleteConnection(connection.id);
             }
             menu.style.display = 'none';
@@ -924,6 +953,7 @@ class CanvasManager {
     toJSON() {
         const componentsData = Array.from(this.components.values()).map(comp => ({
             id: comp.id, name: comp.name, x: comp.x, y: comp.y, color: comp.color,
+            spriteX: comp.spriteX, spriteY: comp.spriteY,
             inputs: comp.inputs.map(i => i.name), outputs: comp.outputs.map(o => o.name)
         }));
         
@@ -943,7 +973,9 @@ class CanvasManager {
         for (const compData of data.components || []) {
             const component = new Component(compData.id, compData.name, compData.x, compData.y,
                 compData.inputs || [], compData.outputs || []);
-            component.color = compData.color || '#ffaa00';
+            component.color = compData.color || '#2d2d2d';
+            component.spriteX = compData.spriteX;
+            component.spriteY = compData.spriteY;
             this.components.set(component.id, component);
         }
         
