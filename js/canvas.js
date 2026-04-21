@@ -20,6 +20,9 @@ class CanvasManager {
         this.touchStartDistance = 0;
         this.touchStartZoom = 1;
         this.isTouchPinching = false;
+        this.lastTouchX = 0;
+        this.lastTouchY = 0;
+        this.isTouching = false;
         
         // 连接状态
         this.isConnecting = false;
@@ -148,7 +151,7 @@ class CanvasManager {
         this.onMouseUp(fakeEvent);
     }
     
-    // ========== 原有鼠标事件保持不变 ==========
+    // ========== 历史记录 ==========
     saveToHistory(action) {
         if (this.historyIndex < this.history.length - 1) {
             this.history = this.history.slice(0, this.historyIndex + 1);
@@ -156,7 +159,8 @@ class CanvasManager {
         
         const componentsData = Array.from(this.components.values()).map(c => ({
             id: c.id, name: c.name, x: c.x, y: c.y, color: c.color,
-            spriteX: c.spriteX, spriteY: c.spriteY,
+            spriteX: c.spriteX, spriteY: c.spriteY, menuId: c.menuId,
+            width: c.width, height: c.height,
             inputs: c.inputs.map(i => ({ id: i.id, name: i.name, index: i.index })),
             outputs: c.outputs.map(o => ({ id: o.id, name: o.name, index: o.index }))
         }));
@@ -203,6 +207,9 @@ class CanvasManager {
             comp.color = c.color || '#3a6ea5';
             comp.spriteX = c.spriteX;
             comp.spriteY = c.spriteY;
+            comp.menuId = c.menuId;
+            if (c.width) comp.width = c.width;
+            if (c.height) comp.height = c.height;
             this.components.set(comp.id, comp);
         }
         
@@ -306,6 +313,7 @@ class CanvasManager {
     onMouseDown(e) {
         const { x, y } = this.getMousePos(e);
         
+        // 检查是否点击连接线
         const clickedConnection = this.findConnectionAt(x, y);
         if (clickedConnection && e.button === 0) {
             this.selectedConnection = clickedConnection;
@@ -315,6 +323,7 @@ class CanvasManager {
             return;
         }
         
+        // 检查是否点击端口
         const portClick = this.checkPortClick(x, y);
         if (portClick) {
             this.startConnecting(portClick);
@@ -322,8 +331,20 @@ class CanvasManager {
             return;
         }
         
+        // 检查是否点击组件
         const clickedComponent = this.findComponentAt(x, y);
         if (clickedComponent) {
+            // 检查是否点击调整大小手柄
+            const resizeHandle = clickedComponent.hitResizeHandle(x, y);
+            if (resizeHandle) {
+                this.selectedComponents.clear();
+                this.selectedComponents.add(clickedComponent);
+                clickedComponent.startResize(resizeHandle.edge, x, y);
+                this.canvas.style.cursor = resizeHandle.cursor;
+                e.preventDefault();
+                return;
+            }
+            
             if (e.shiftKey) {
                 if (this.selectedComponents.has(clickedComponent)) {
                     this.selectedComponents.delete(clickedComponent);
@@ -350,6 +371,7 @@ class CanvasManager {
             return;
         }
         
+        // 框选
         if (!e.shiftKey) {
             this.selectedComponents.clear();
             this.selectedConnection = null;
@@ -360,6 +382,7 @@ class CanvasManager {
         this.selectStart = { x, y };
         this.selectEnd = { x, y };
         
+        // 平移（中键或右键）
         if (e.button === 1 || e.button === 2) {
             this.isSelecting = false;
             this.isPanning = true;
@@ -388,6 +411,19 @@ class CanvasManager {
             return;
         }
         
+        // 调整大小中
+        let resizing = false;
+        for (const comp of this.selectedComponents) {
+            if (comp.isResizing) {
+                comp.resize(x, y);
+                resizing = true;
+                this.draw();
+                break;
+            }
+        }
+        if (resizing) return;
+        
+        // 拖动组件
         let dragging = false;
         for (const comp of this.selectedComponents) {
             if (comp.isDragging) {
@@ -402,6 +438,7 @@ class CanvasManager {
             return;
         }
         
+        // 连接中
         if (this.isConnecting) {
             this.currentMousePos = { x, y };
             this.hoverPort = this.checkPortClick(x, y);
@@ -409,6 +446,7 @@ class CanvasManager {
             return;
         }
         
+        // 悬停检测
         const newHoverConnection = this.findConnectionAt(x, y);
         if (newHoverConnection !== this.hoverConnection) {
             this.hoverConnection = newHoverConnection;
@@ -430,6 +468,10 @@ class CanvasManager {
         }
         
         for (const comp of this.components.values()) {
+            if (comp.isResizing) {
+                comp.endResize();
+                this.saveToHistory('resize');
+            }
             comp.isDragging = false;
         }
         
@@ -676,6 +718,9 @@ class CanvasManager {
             newComp.color = comp.color;
             newComp.spriteX = comp.spriteX;
             newComp.spriteY = comp.spriteY;
+            newComp.menuId = comp.menuId;
+            newComp.width = comp.width;
+            newComp.height = comp.height;
             newComponents.push(newComp);
         }
         
@@ -794,8 +839,21 @@ class CanvasManager {
         this.ctx.strokeStyle = borderColor;
         this.ctx.lineWidth = isSelected ? 2.5 : 1.5;
         
-        this.ctx.fillRect(component.x, component.y, component.width, component.height);
-        this.ctx.strokeRect(component.x, component.y, component.width, component.height);
+        // 圆角矩形
+        const radius = 6;
+        this.ctx.beginPath();
+        this.ctx.moveTo(component.x + radius, component.y);
+        this.ctx.lineTo(component.x + component.width - radius, component.y);
+        this.ctx.quadraticCurveTo(component.x + component.width, component.y, component.x + component.width, component.y + radius);
+        this.ctx.lineTo(component.x + component.width, component.y + component.height - radius);
+        this.ctx.quadraticCurveTo(component.x + component.width, component.y + component.height, component.x + component.width - radius, component.y + component.height);
+        this.ctx.lineTo(component.x + radius, component.y + component.height);
+        this.ctx.quadraticCurveTo(component.x, component.y + component.height, component.x, component.y + component.height - radius);
+        this.ctx.lineTo(component.x, component.y + radius);
+        this.ctx.quadraticCurveTo(component.x, component.y, component.x + radius, component.y);
+        this.ctx.closePath();
+        this.ctx.fill();
+        this.ctx.stroke();
         
         // 电池名称 - 居中对齐
         this.ctx.fillStyle = '#ffffff';
@@ -808,7 +866,7 @@ class CanvasManager {
         const iconPos = component.getIconPosition();
         this.drawComponentIcon(component, iconPos.x, iconPos.y, 24);
         
-        // 输入端口
+        // 输入端口（左侧）
         component.inputs.forEach((input) => {
             const pos = component.getPortPosition(input);
             this.drawPort(pos.x, pos.y, '#4caf50', input.connectedTo ? '#8bc34a' : '#4caf50');
@@ -817,7 +875,7 @@ class CanvasManager {
             this.ctx.fillText(input.name, pos.x + 8, pos.y + 3);
         });
         
-        // 输出端口
+        // 输出端口（右侧）
         component.outputs.forEach((output) => {
             const pos = component.getPortPosition(output);
             this.drawPort(pos.x, pos.y, '#ff9800', output.connectedTo ? '#ffc107' : '#ff9800');
@@ -826,13 +884,20 @@ class CanvasManager {
             const textWidth = this.ctx.measureText(output.name).width;
             this.ctx.fillText(output.name, pos.x - 7 - textWidth, pos.y + 3);
         });
+        
+        // 绘制调整大小手柄（选中时显示）
+        if (isSelected) {
+            this.drawResizeHandles(component);
+        }
     }
     
     drawComponentIcon(component, x, y, size = 24) {
         const iconX = x - size / 2;
         const iconY = y - size / 2;
         
-        const spriteImg = typeof getSpriteImage === 'function' ? getSpriteImage() : null;
+        // 根据组件所属菜单获取对应的雪碧图
+        const menuId = component.menuId || 'kangaroo';
+        const spriteImg = typeof getSpriteForMenu === 'function' ? getSpriteForMenu(menuId) : null;
         
         if (component.spriteX !== null && component.spriteY !== null && spriteImg && spriteImg.complete) {
             try {
@@ -842,7 +907,9 @@ class CanvasManager {
                     iconX, iconY, size, size
                 );
                 return;
-            } catch (e) {}
+            } catch (e) {
+                console.warn('绘制雪碧图失败:', e);
+            }
         }
         
         // 降级默认图标
@@ -851,6 +918,27 @@ class CanvasManager {
         this.ctx.fillStyle = '#fff';
         this.ctx.font = '14px monospace';
         this.ctx.fillText('⚡', iconX + 7, iconY + 18);
+    }
+    
+    drawResizeHandles(component) {
+        const handleSize = 8;
+        const handles = [
+            { x: component.x, y: component.y, cursor: 'nw-resize' },
+            { x: component.x + component.width / 2, y: component.y, cursor: 'n-resize' },
+            { x: component.x + component.width, y: component.y, cursor: 'ne-resize' },
+            { x: component.x + component.width, y: component.y + component.height / 2, cursor: 'e-resize' },
+            { x: component.x + component.width, y: component.y + component.height, cursor: 'se-resize' },
+            { x: component.x + component.width / 2, y: component.y + component.height, cursor: 's-resize' },
+            { x: component.x, y: component.y + component.height, cursor: 'sw-resize' },
+            { x: component.x, y: component.y + component.height / 2, cursor: 'w-resize' }
+        ];
+        
+        this.ctx.fillStyle = '#ffaa00';
+        for (const handle of handles) {
+            this.ctx.fillRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
+            this.ctx.strokeStyle = '#fff';
+            this.ctx.strokeRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
+        }
     }
     
     drawPort(x, y, color, fillColor) {
@@ -1044,7 +1132,8 @@ class CanvasManager {
     toJSON() {
         const componentsData = Array.from(this.components.values()).map(comp => ({
             id: comp.id, name: comp.name, x: comp.x, y: comp.y, color: comp.color,
-            spriteX: comp.spriteX, spriteY: comp.spriteY,
+            spriteX: comp.spriteX, spriteY: comp.spriteY, menuId: comp.menuId,
+            width: comp.width, height: comp.height,
             inputs: comp.inputs.map(i => i.name), outputs: comp.outputs.map(o => o.name)
         }));
         
@@ -1067,6 +1156,9 @@ class CanvasManager {
             component.color = compData.color || '#3a6ea5';
             component.spriteX = compData.spriteX;
             component.spriteY = compData.spriteY;
+            component.menuId = compData.menuId;
+            if (compData.width) component.width = compData.width;
+            if (compData.height) component.height = compData.height;
             this.components.set(component.id, component);
         }
         
