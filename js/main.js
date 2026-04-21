@@ -5,8 +5,11 @@ let lang = 'cn';
 let componentsData = {};
 let groupsList = [];
 
-// 跨项目引用 JSON 数据（从 Rhino-gh-kangaroo-docs 仓库）
-const JSON_URL = 'https://cdn.jsdelivr.net/gh/zhang1394725324/Rhino-gh-kangaroo-docs@main/data/kangaroo.json';
+// 跨项目引用 JSON 数据（使用 GitHub Raw，已验证可用）
+const JSON_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json';
+
+// 雪碧图 URL（也改用 Raw 链接保持一致）
+const SPRITE_URL = 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png';
 
 // 分组配置
 const GROUP_ORDER = [
@@ -28,7 +31,6 @@ const groupDisplayNames = {
     'Utility': '实用工具'
 };
 
-// 英文分组名称
 const groupDisplayNamesEn = {
     'Goals-6dof': '6-DOF Constraints',
     'Goals-Angle': 'Angle Constraints',
@@ -50,7 +52,7 @@ function loadComponentsData() {
     
     container.innerHTML = '<div style="color: #888; text-align: center; padding: 40px;"><i class="fas fa-spinner fa-pulse"></i> 加载组件数据中...</div>';
     
-    fetch(JSON_URL + '?' + Date.now())
+    fetch(JSON_URL + '?t=' + Date.now())
         .then(res => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
@@ -69,7 +71,7 @@ function loadComponentsData() {
             console.error('❌ 数据加载失败:', err);
             container.innerHTML = `<div style="color:#dc2626;text-align:center;padding:40px;">
                 <i class="fas fa-exclamation-triangle"></i> 数据加载失败: ${err.message}<br>
-                <small>请确保资源仓库可访问: ${JSON_URL}</small>
+                <small>请检查网络连接</small>
             </div>`;
         });
 }
@@ -252,7 +254,6 @@ function setupLanguage() {
             langBtn.textContent = lang === 'cn' ? 'EN' : '中';
             renderCategories();
             
-            // 如果有选中的组件，刷新详情显示
             if (window.currentDetailItem) {
                 showComponentDetail(window.currentDetailItem);
             }
@@ -275,7 +276,6 @@ function setupLibrarySearch() {
             item.style.display = matches ? '' : 'none';
         });
         
-        // 显示/隐藏空卡片
         const cards = document.querySelectorAll('.category-card');
         cards.forEach(card => {
             const visibleItems = card.querySelectorAll('.card-icon-item[style=""]');
@@ -390,10 +390,8 @@ function setupUndoRedo() {
 // ========== 键盘快捷键 ==========
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        // 忽略输入框内的快捷键
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         
-        // Ctrl+Z / Ctrl+Y
         if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
             e.preventDefault();
             if (e.shiftKey) {
@@ -407,24 +405,16 @@ function setupKeyboardShortcuts() {
             e.preventDefault();
             canvasManager.redo();
             canvasManager.updateStatus(t('statusRedo'));
-        }
-        // Delete
-        else if (e.key === 'Delete') {
+        } else if (e.key === 'Delete') {
             canvasManager.deleteSelectedComponents();
-        }
-        // Ctrl+D 复制
-        else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
             e.preventDefault();
             canvasManager.duplicateSelectedComponents();
             canvasManager.updateStatus(t('statusCopied'));
-        }
-        // Ctrl+A 全选
-        else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
             e.preventDefault();
             canvasManager.selectAll();
-        }
-        // Esc 取消选择
-        else if (e.key === 'Escape') {
+        } else if (e.key === 'Escape') {
             canvasManager.clearSelection();
         }
     });
@@ -453,10 +443,8 @@ function setupHelpModal() {
     }
 }
 
-// ========== 组件详情（可选，如果不需要可以留空）==========
+// ========== 组件详情（可选）==========
 async function showComponentDetail(item) {
-    // 这个函数可选，用于显示组件详情
-    // 如果你不需要详情功能，可以保持为空
     console.log('组件详情:', item.name);
 }
 
@@ -470,7 +458,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
-    // 创建画布管理器
     canvasManager = new CanvasManager(canvas, null, (component) => {
         if (component) {
             canvasManager.updateStatus(`${t('statusSelected')}: ${component.name}`);
@@ -479,10 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // 加载组件数据
     loadComponentsData();
-    
-    // 设置各种功能
     setupCanvasDrop();
     setupLanguage();
     setupLibrarySearch();
