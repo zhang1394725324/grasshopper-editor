@@ -302,6 +302,31 @@ function setupClearCanvas() {
     });
 }
 
+// 添加电池搜索功能
+function setupLibrarySearch() {
+    const libraryHeader = document.querySelector('.library-header');
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = '🔍 搜索电池...';
+    searchInput.className = 'library-search';
+    libraryHeader.parentElement.insertBefore(searchInput, libraryHeader.nextSibling);
+    
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const items = document.querySelectorAll('.component-item');
+        
+        items.forEach(item => {
+            const name = item.querySelector('.component-name').textContent.toLowerCase();
+            if (name.includes(searchTerm)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+}
+
+
 // ========== 键盘快捷键 ==========
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
@@ -348,6 +373,7 @@ function setupKeyboardShortcuts() {
 // ========== 初始化所有功能 ==========
 function init() {
     initComponentLibrary();
+    setupLibrarySearch();  // 添加这行
     setupCanvasDrop();
     setupCustomComponent();
     setupImportExport();
