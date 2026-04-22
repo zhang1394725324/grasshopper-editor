@@ -70,12 +70,10 @@ class CanvasManager {
         const touches = e.touches;
         
         if (touches.length === 1) {
-            // 单指：拖拽或点击
             const touch = touches[0];
             const x = (touch.clientX - rect.left - this.panOffset.x) / this.zoom;
             const y = (touch.clientY - rect.top - this.panOffset.y) / this.zoom;
             
-            // 模拟鼠标按下
             const fakeEvent = { clientX: touch.clientX, clientY: touch.clientY, button: 0 };
             this.onMouseDown(fakeEvent);
             
@@ -84,7 +82,6 @@ class CanvasManager {
             this.isTouching = true;
             
         } else if (touches.length === 2) {
-            // 双指：缩放
             this.isTouchPinching = true;
             const dx = touches[0].clientX - touches[1].clientX;
             const dy = touches[0].clientY - touches[1].clientY;
@@ -99,7 +96,6 @@ class CanvasManager {
         const touches = e.touches;
         
         if (touches.length === 1 && this.isTouching && !this.isTouchPinching) {
-            // 单指平移
             const touch = touches[0];
             const dx = touch.clientX - this.lastTouchX;
             const dy = touch.clientY - this.lastTouchY;
@@ -112,7 +108,6 @@ class CanvasManager {
             this.draw();
             
         } else if (touches.length === 2 && this.isTouchPinching) {
-            // 双指缩放
             const dx = touches[0].clientX - touches[1].clientX;
             const dy = touches[0].clientY - touches[1].clientY;
             const currentDistance = Math.hypot(dx, dy);
@@ -123,7 +118,6 @@ class CanvasManager {
                 newZoom = Math.min(2, Math.max(0.5, newZoom));
                 
                 if (newZoom !== this.zoom) {
-                    // 以触摸点中心缩放
                     const centerX = (touches[0].clientX + touches[1].clientX) / 2;
                     const centerY = (touches[0].clientY + touches[1].clientY) / 2;
                     
@@ -146,7 +140,6 @@ class CanvasManager {
         this.isTouchPinching = false;
         this.isPanning = false;
         
-        // 模拟鼠标松开
         const fakeEvent = { button: 0 };
         this.onMouseUp(fakeEvent);
     }
@@ -313,7 +306,6 @@ class CanvasManager {
     onMouseDown(e) {
         const { x, y } = this.getMousePos(e);
         
-        // 检查是否点击连接线
         const clickedConnection = this.findConnectionAt(x, y);
         if (clickedConnection && e.button === 0) {
             this.selectedConnection = clickedConnection;
@@ -323,7 +315,6 @@ class CanvasManager {
             return;
         }
         
-        // 检查是否点击端口
         const portClick = this.checkPortClick(x, y);
         if (portClick) {
             this.startConnecting(portClick);
@@ -331,10 +322,8 @@ class CanvasManager {
             return;
         }
         
-        // 检查是否点击组件
         const clickedComponent = this.findComponentAt(x, y);
         if (clickedComponent) {
-            // 检查是否点击调整大小手柄
             const resizeHandle = clickedComponent.hitResizeHandle(x, y);
             if (resizeHandle) {
                 this.selectedComponents.clear();
@@ -371,7 +360,6 @@ class CanvasManager {
             return;
         }
         
-        // 框选
         if (!e.shiftKey) {
             this.selectedComponents.clear();
             this.selectedConnection = null;
@@ -382,7 +370,6 @@ class CanvasManager {
         this.selectStart = { x, y };
         this.selectEnd = { x, y };
         
-        // 平移（中键或右键）
         if (e.button === 1 || e.button === 2) {
             this.isSelecting = false;
             this.isPanning = true;
@@ -411,7 +398,6 @@ class CanvasManager {
             return;
         }
         
-        // 调整大小中
         let resizing = false;
         for (const comp of this.selectedComponents) {
             if (comp.isResizing) {
@@ -423,7 +409,6 @@ class CanvasManager {
         }
         if (resizing) return;
         
-        // 拖动组件
         let dragging = false;
         for (const comp of this.selectedComponents) {
             if (comp.isDragging) {
@@ -438,7 +423,6 @@ class CanvasManager {
             return;
         }
         
-        // 连接中
         if (this.isConnecting) {
             this.currentMousePos = { x, y };
             this.hoverPort = this.checkPortClick(x, y);
@@ -446,7 +430,6 @@ class CanvasManager {
             return;
         }
         
-        // 悬停检测
         const newHoverConnection = this.findConnectionAt(x, y);
         if (newHoverConnection !== this.hoverConnection) {
             this.hoverConnection = newHoverConnection;
@@ -895,11 +878,17 @@ class CanvasManager {
         const iconX = x - size / 2;
         const iconY = y - size / 2;
         
-        // 根据组件所属菜单获取对应的雪碧图
+        // 获取当前菜单的雪碧图
         const menuId = component.menuId || 'kangaroo';
-        const spriteImg = typeof getSpriteForMenu === 'function' ? getSpriteForMenu(menuId) : null;
+        let spriteImg = null;
         
-        if (component.spriteX !== null && component.spriteY !== null && spriteImg && spriteImg.complete) {
+        // 从全局获取预加载的雪碧图
+        if (window.spriteImages && window.spriteImages[menuId]) {
+            spriteImg = window.spriteImages[menuId];
+        }
+        
+        // 如果有雪碧图且已加载完成，绘制图标
+        if (spriteImg && spriteImg.complete && component.spriteX !== undefined && component.spriteX !== null) {
             try {
                 this.ctx.drawImage(
                     spriteImg,
@@ -912,12 +901,12 @@ class CanvasManager {
             }
         }
         
-        // 降级默认图标
+        // 降级方案：显示电池名称首字母
         this.ctx.fillStyle = '#2a5e95';
         this.ctx.fillRect(iconX, iconY, size, size);
-        this.ctx.fillStyle = '#fff';
-        this.ctx.font = '14px monospace';
-        this.ctx.fillText('⚡', iconX + 7, iconY + 18);
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 12px monospace';
+        this.ctx.fillText(component.name.charAt(0), iconX + 8, iconY + 18);
     }
     
     drawResizeHandles(component) {
