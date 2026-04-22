@@ -48,6 +48,36 @@ const MENU_CONFIG = {
             'Mesh': 'Mesh Tools'
         }
     },
+    params: {
+        id: 'params',
+        nameCn: '📊 Params',
+        nameEn: '📊 Params',
+        icon: 'fa-sliders-h',
+        dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/params.json',
+        spriteUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/params_icons.png',
+        detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/params/',
+        groupOrder: ['Primitive', 'Input', 'Output', 'File', 'Annotation', 'Model', 'Special', 'Get'],
+        groupNames: {
+            'Primitive': '基本类型',
+            'Input': '输入组件',
+            'Output': '输出组件',
+            'File': '文件操作',
+            'Annotation': '标注工具',
+            'Model': '模型对象',
+            'Special': '特殊工具',
+            'Get': '获取器'
+        },
+        groupNamesEn: {
+            'Primitive': 'Primitive',
+            'Input': 'Input',
+            'Output': 'Output',
+            'File': 'File',
+            'Annotation': 'Annotation',
+            'Model': 'Model',
+            'Special': 'Special',
+            'Get': 'Getter'
+        }
+    }
     utility: {
         id: 'utility',
         nameCn: '🔧 工具',
