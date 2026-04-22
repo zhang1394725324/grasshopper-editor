@@ -3,8 +3,9 @@ let canvasManager;
 let dragData = null;
 let lang = 'cn';
 let activeMenuId = 'kangaroo';
+let detailsCache = {};
 
-// 菜单配置 - 只保留 kangaroo 和 params
+// 菜单配置
 const MENU_CONFIG = {
     kangaroo: {
         id: 'kangaroo',
@@ -13,9 +14,9 @@ const MENU_CONFIG = {
         icon: 'fa-puzzle-piece',
         dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json',
         spriteUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png',
-        detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/kangaroo/',
+        detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/kangaroo2/',
         groupOrder: ['Goals-6dof', 'Goals-Angle', 'Goals-Co', 'Goals-Col', 'Goals-Lin',
-                     'Goals-Mesh', 'Goals-On', 'Goals-Pt', 'Main', 'Mesh'],
+                     'Goals-Mesh', 'Goals-On', 'Goals-Pt', 'Main', 'Mesh', 'Utility'],
         groupNames: {
             'Goals-6dof': '六自由度约束',
             'Goals-Angle': '角度约束',
@@ -26,7 +27,8 @@ const MENU_CONFIG = {
             'Goals-On': '在几何体上',
             'Goals-Pt': '点/锚点约束',
             'Main': '求解器与核心',
-            'Mesh': '网格工具'
+            'Mesh': '网格工具',
+            'Utility': '实用工具'
         },
         groupNamesEn: {
             'Goals-6dof': '6-DOF Constraints',
@@ -38,7 +40,8 @@ const MENU_CONFIG = {
             'Goals-On': 'On Geometry',
             'Goals-Pt': 'Point/Anchor Constraints',
             'Main': 'Solver & Core',
-            'Mesh': 'Mesh Tools'
+            'Mesh': 'Mesh Tools',
+            'Utility': 'Utility'
         }
     },
     params: {
@@ -82,27 +85,76 @@ let currentConfig = null;
 
 window.dragData = dragData;
 
-// ========== 提取端口名称 ==========
-function extractInputs(item) {
-    if (!item) return [];
-    if (item.parameters && Array.isArray(item.parameters)) {
-        return item.parameters.map(p => p.name || p);
-    }
-    if (item.inputs && Array.isArray(item.inputs)) {
-        return item.inputs;
-    }
-    return [];
+// 预加载雪碧图
+window.spriteImages = {};
+
+function preloadSprites() {
+    Object.keys(MENU_CONFIG).forEach(menuId => {
+        const config = MENU_CONFIG[menuId];
+        if (config.spriteUrl) {
+            const img = new Image();
+            img.onload = () => {
+                console.log(`✅ 雪碧图加载成功: ${menuId}`);
+                window.spriteImages[menuId] = img;
+                if (canvasManager) canvasManager.draw();
+            };
+            img.onerror = () => {
+                console.warn(`⚠️ 雪碧图加载失败: ${menuId}`, config.spriteUrl);
+                window.spriteImages[menuId] = null;
+            };
+            img.src = config.spriteUrl;
+        }
+    });
 }
 
-function extractOutputs(item) {
-    if (!item) return [];
-    if (item.outputs && Array.isArray(item.outputs)) {
-        return item.outputs.map(o => o.name || o);
+// 从详情文件夹加载端口数据
+async function loadComponentDetails(menuId, componentName) {
+    const cacheKey = `${menuId}_${componentName}`;
+    if (detailsCache[cacheKey]) {
+        return detailsCache[cacheKey];
     }
-    return [];
+    
+    const config = MENU_CONFIG[menuId];
+    if (!config) return { inputs: [], outputs: [] };
+    
+    try {
+        const url = `${config.detailsBaseUrl}${componentName}.json?t=${Date.now()}`;
+        console.log(`📥 加载详情: ${url}`);
+        
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.warn(`⚠️ 无法加载 ${componentName}.json`);
+            return { inputs: [], outputs: [] };
+        }
+        
+        const detail = await response.json();
+        
+        const inputs = [];
+        if (detail.parameters && Array.isArray(detail.parameters)) {
+            detail.parameters.forEach(p => {
+                if (p.name) inputs.push(p.name);
+            });
+        }
+        
+        const outputs = [];
+        if (detail.outputs && Array.isArray(detail.outputs)) {
+            detail.outputs.forEach(o => {
+                if (o.name) outputs.push(o.name);
+            });
+        }
+        
+        const result = { inputs, outputs };
+        detailsCache[cacheKey] = result;
+        
+        console.log(`✅ 加载 ${componentName} 完成: 输入${inputs.length}, 输出${outputs.length}`);
+        return result;
+    } catch (err) {
+        console.error(`❌ 加载 ${componentName} 失败:`, err);
+        return { inputs: [], outputs: [] };
+    }
 }
 
-// ========== 加载数据 ==========
+// 加载数据
 function loadMenuData(menuId) {
     const config = MENU_CONFIG[menuId];
     if (!config) return Promise.reject(`菜单 ${menuId} 不存在`);
@@ -132,6 +184,8 @@ function loadAllMenusData() {
         container.innerHTML = '<div style="color: #888; text-align: center; padding: 40px;"><i class="fas fa-spinner fa-pulse"></i> 加载组件数据中...</div>';
     }
     
+    preloadSprites();
+    
     const promises = Object.keys(MENU_CONFIG).map(menuId => loadMenuData(menuId));
     
     Promise.all(promises)
@@ -149,7 +203,7 @@ function loadAllMenusData() {
         });
 }
 
-// ========== 渲染UI ==========
+// 渲染UI
 function renderMenuTabs() {
     const tabsContainer = document.getElementById('libraryTabs');
     if (!tabsContainer) return;
@@ -257,12 +311,8 @@ function createIconItem(item) {
     const displayName = lang === 'cn' ? (item.cn || item.name) : (item.en || item.name);
     iconItem.title = displayName;
     
-    const inputs = extractInputs(item);
-    const outputs = extractOutputs(item);
-    
+    // 存储基础信息
     iconItem.dataset.componentName = item.name;
-    iconItem.dataset.componentInputs = JSON.stringify(inputs);
-    iconItem.dataset.componentOutputs = JSON.stringify(outputs);
     iconItem.dataset.spriteX = item.spriteX || 0;
     iconItem.dataset.spriteY = item.spriteY || 0;
     iconItem.dataset.menuId = activeMenuId;
@@ -283,21 +333,33 @@ function createIconItem(item) {
     iconItem.appendChild(sprite);
     iconItem.appendChild(nameSpan);
     
-    iconItem.addEventListener('dragstart', (e) => {
-        const componentData = {
-            name: item.name,
-            inputs: inputs,
-            outputs: outputs,
-            spriteX: item.spriteX || 0,
-            spriteY: item.spriteY || 0,
-            menuId: activeMenuId
-        };
-        dragData = componentData;
-        window.dragData = componentData;
-        e.dataTransfer.setData('text/plain', JSON.stringify(componentData));
+    // 拖拽事件 - 从 details 文件夹加载端口
+    iconItem.addEventListener('dragstart', async (e) => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({ 
+            name: item.name, 
+            menuId: activeMenuId 
+        }));
         e.dataTransfer.effectAllowed = 'copy';
         iconItem.style.opacity = '0.5';
-        console.log(`🚀 拖拽: ${componentData.name}, 输入:${inputs.length}, 输出:${outputs.length}`);
+        
+        console.log(`📥 拖拽开始，加载 ${activeMenuId}/${item.name} 的端口数据...`);
+        
+        // 从 details 文件夹加载端口
+        const details = await loadComponentDetails(activeMenuId, item.name);
+        
+        const componentData = {
+            name: item.name,
+            inputs: details.inputs,
+            outputs: details.outputs,
+            spriteX: parseInt(iconItem.dataset.spriteX) || 0,
+            spriteY: parseInt(iconItem.dataset.spriteY) || 0,
+            menuId: activeMenuId
+        };
+        
+        dragData = componentData;
+        window.dragData = componentData;
+        
+        console.log(`🚀 拖拽: ${componentData.name}, 输入:${details.inputs.length}, 输出:${details.outputs.length}`);
     });
     
     iconItem.addEventListener('dragend', (e) => {
@@ -319,18 +381,37 @@ function setupCanvasDrop() {
         e.dataTransfer.dropEffect = 'copy';
     });
     
-    canvasContainer.addEventListener('drop', (e) => {
+    canvasContainer.addEventListener('drop', async (e) => {
         e.preventDefault();
         
         let componentData = null;
         
-        try {
-            const jsonData = e.dataTransfer.getData('text/plain');
-            if (jsonData) componentData = JSON.parse(jsonData);
-        } catch (err) {}
+        if (window.dragData) {
+            componentData = window.dragData;
+        }
+        if (!componentData && dragData) {
+            componentData = dragData;
+        }
         
-        if (!componentData && window.dragData) componentData = window.dragData;
-        if (!componentData && dragData) componentData = dragData;
+        if (!componentData) {
+            try {
+                const jsonData = e.dataTransfer.getData('text/plain');
+                if (jsonData) {
+                    const parsed = JSON.parse(jsonData);
+                    if (parsed.name && parsed.menuId) {
+                        const details = await loadComponentDetails(parsed.menuId, parsed.name);
+                        componentData = {
+                            name: parsed.name,
+                            inputs: details.inputs,
+                            outputs: details.outputs,
+                            spriteX: 0,
+                            spriteY: 0,
+                            menuId: parsed.menuId
+                        };
+                    }
+                }
+            } catch (err) {}
+        }
         
         if (!componentData) {
             console.warn('❌ 没有拖拽数据');
@@ -553,7 +634,7 @@ function setupHelpModal() {
     }
 }
 
-// ========== 初始化 ==========
+// 初始化
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 初始化 Kangaroo2 电池编辑器...');
     
