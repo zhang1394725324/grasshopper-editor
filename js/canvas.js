@@ -878,11 +878,11 @@ class CanvasManager {
         const iconX = x - size / 2;
         const iconY = y - size / 2;
         
-        // 获取当前菜单的雪碧图
+        // 根据组件所属菜单获取对应的雪碧图
         const menuId = component.menuId || 'kangaroo';
         let spriteImg = null;
         
-        // 从全局获取预加载的雪碧图
+        // 从全局预加载的雪碧图中获取
         if (window.spriteImages && window.spriteImages[menuId]) {
             spriteImg = window.spriteImages[menuId];
         }
@@ -906,7 +906,8 @@ class CanvasManager {
         this.ctx.fillRect(iconX, iconY, size, size);
         this.ctx.fillStyle = '#ffffff';
         this.ctx.font = 'bold 12px monospace';
-        this.ctx.fillText(component.name.charAt(0), iconX + 8, iconY + 18);
+        const firstChar = component.name ? component.name.charAt(0) : '?';
+        this.ctx.fillText(firstChar, iconX + 8, iconY + 18);
     }
     
     drawResizeHandles(component) {
