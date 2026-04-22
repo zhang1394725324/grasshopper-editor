@@ -1,26 +1,19 @@
-// 主程序 - 多菜单架构（支持独立雪碧图和详情）
+// 主程序 - 多菜单架构
 let canvasManager;
 let dragData = null;
 let lang = 'cn';
 let activeMenuId = 'kangaroo';
 
-// 雪碧图缓存
-let spriteImages = {};
-
-// ========== 菜单配置 - 在这里添加新菜单 ==========
+// 菜单配置 - 只保留 kangaroo 和 params
 const MENU_CONFIG = {
     kangaroo: {
         id: 'kangaroo',
         nameCn: '🦘 Kangaroo2',
         nameEn: '🦘 Kangaroo2',
         icon: 'fa-puzzle-piece',
-        // 数据文件路径
         dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json',
-        // 雪碧图路径
         spriteUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png',
-        // 详情文件基础路径
         detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/kangaroo/',
-        // 分组配置
         groupOrder: ['Goals-6dof', 'Goals-Angle', 'Goals-Co', 'Goals-Col', 'Goals-Lin',
                      'Goals-Mesh', 'Goals-On', 'Goals-Pt', 'Main', 'Mesh'],
         groupNames: {
@@ -78,45 +71,10 @@ const MENU_CONFIG = {
             'Get': 'Getter'
         }
     }
-    utility: {
-        id: 'utility',
-        nameCn: '🔧 工具',
-        nameEn: '🔧 Utility',
-        icon: 'fa-tools',
-        dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/utility.json',
-        spriteUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/utility_icons.png',
-        detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/utility/',
-        groupOrder: ['Utility'],
-        groupNames: {
-            'Utility': '工具/实用'
-        },
-        groupNamesEn: {
-            'Utility': 'Utility'
-        }
-    }
-    // ========== 添加新菜单示例 ==========
-    // mesh: {
-    //     id: 'mesh',
-    //     nameCn: '🔷 网格',
-    //     nameEn: '🔷 Mesh',
-    //     icon: 'fa-cube',
-    //     dataUrl: 'https://.../data/mesh.json',
-    //     spriteUrl: 'https://.../img/sprites/mesh_icons.png',
-    //     detailsBaseUrl: 'https://.../data/details/mesh/',
-    //     groupOrder: ['MeshTools', 'SubD'],
-    //     groupNames: {
-    //         'MeshTools': '网格工具',
-    //         'SubD': '细分曲面'
-    //     },
-    //     groupNamesEn: {
-    //         'MeshTools': 'Mesh Tools',
-    //         'SubD': 'Subdivision'
-    //     }
-    // }
 };
 
-let menuData = {};      // 存储各菜单的原始数据
-let currentData = {};   // 当前显示的数据
+let menuData = {};
+let currentData = {};
 let currentGroupOrder = [];
 let currentGroupNames = {};
 let currentGroupNamesEn = {};
@@ -124,119 +82,32 @@ let currentConfig = null;
 
 window.dragData = dragData;
 
-// ========== 雪碧图加载 ==========
-function loadSpriteForMenu(menuId, callback) {
-    const config = MENU_CONFIG[menuId];
-    if (!config || !config.spriteUrl) {
-        if (callback) callback(null);
-        return;
-    }
-    
-    // 检查缓存
-    if (spriteImages[menuId] && spriteImages[menuId].complete) {
-        if (callback) callback(spriteImages[menuId]);
-        return;
-    }
-    
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-        console.log(`✅ 雪碧图加载成功: ${menuId}`);
-        spriteImages[menuId] = img;
-        if (callback) callback(img);
-    };
-    img.onerror = () => {
-        console.warn(`⚠️ 雪碧图加载失败: ${menuId}`, config.spriteUrl);
-        spriteImages[menuId] = null;
-        if (callback) callback(null);
-    };
-    img.src = config.spriteUrl;
-}
-
-function getSpriteForMenu(menuId) {
-    return spriteImages[menuId] || null;
-}
-
-// ========== 加载组件详情（从独立文件夹）==========
-async function loadComponentDetails(menuId, componentName) {
-    const config = MENU_CONFIG[menuId];
-    if (!config) return { inputs: [], outputs: [] };
-    
-    // 检查缓存（使用 menuId + componentName 作为缓存键）
-    const cacheKey = `${menuId}_${componentName}`;
-    if (window.detailsCache && window.detailsCache[cacheKey]) {
-        return window.detailsCache[cacheKey];
-    }
-    if (!window.detailsCache) window.detailsCache = {};
-    
-    try {
-        const url = `${config.detailsBaseUrl}${componentName}.json?t=${Date.now()}`;
-        console.log(`📥 加载详情: ${url}`);
-        
-        const response = await fetch(url);
-        if (!response.ok) {
-            console.warn(`⚠️ 无法加载 ${componentName}.json`);
-            return { inputs: [], outputs: [] };
-        }
-        
-        const detail = await response.json();
-        
-        // 提取输入端口名称
-        const inputs = [];
-        if (detail.parameters && Array.isArray(detail.parameters)) {
-            detail.parameters.forEach(p => {
-                if (p.name) inputs.push(p.name);
-            });
-        }
-        
-        // 提取输出端口名称
-        const outputs = [];
-        if (detail.outputs && Array.isArray(detail.outputs)) {
-            detail.outputs.forEach(o => {
-                if (o.name) outputs.push(o.name);
-            });
-        }
-        
-        const result = { inputs, outputs };
-        window.detailsCache[cacheKey] = result;
-        
-        console.log(`✅ 加载 ${componentName} 完成: 输入${inputs.length}, 输出${outputs.length}`);
-        return result;
-    } catch (err) {
-        console.error(`❌ 加载 ${componentName} 失败:`, err);
-        return { inputs: [], outputs: [] };
-    }
-}
-
-// 提取输入端口名称（从索引数据）
-function extractInputsFromIndex(item) {
-    if (!item) return null;
+// ========== 提取端口名称 ==========
+function extractInputs(item) {
+    if (!item) return [];
     if (item.parameters && Array.isArray(item.parameters)) {
         return item.parameters.map(p => p.name || p);
     }
     if (item.inputs && Array.isArray(item.inputs)) {
         return item.inputs;
     }
-    return null;
+    return [];
 }
 
-function extractOutputsFromIndex(item) {
-    if (!item) return null;
+function extractOutputs(item) {
+    if (!item) return [];
     if (item.outputs && Array.isArray(item.outputs)) {
         return item.outputs.map(o => o.name || o);
     }
-    return null;
+    return [];
 }
 
-// 加载单个菜单数据
+// ========== 加载数据 ==========
 function loadMenuData(menuId) {
     const config = MENU_CONFIG[menuId];
     if (!config) return Promise.reject(`菜单 ${menuId} 不存在`);
     
     console.log(`📡 加载 ${menuId} 数据:`, config.dataUrl);
-    
-    // 同时预加载雪碧图
-    loadSpriteForMenu(menuId);
     
     return fetch(config.dataUrl + '?t=' + Date.now())
         .then(res => {
@@ -255,7 +126,6 @@ function loadMenuData(menuId) {
         });
 }
 
-// 加载所有菜单数据
 function loadAllMenusData() {
     const container = document.getElementById('categoriesContainer');
     if (container) {
@@ -279,7 +149,7 @@ function loadAllMenusData() {
         });
 }
 
-// 渲染菜单标签页
+// ========== 渲染UI ==========
 function renderMenuTabs() {
     const tabsContainer = document.getElementById('libraryTabs');
     if (!tabsContainer) return;
@@ -299,7 +169,6 @@ function renderMenuTabs() {
     });
 }
 
-// 切换菜单
 function switchMenu(menuId) {
     const config = MENU_CONFIG[menuId];
     if (!config) return;
@@ -313,7 +182,6 @@ function switchMenu(menuId) {
     currentGroupNames = config.groupNames;
     currentGroupNamesEn = config.groupNamesEn;
     
-    // 更新标签页样式
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-menu') === menuId);
     });
@@ -389,27 +257,18 @@ function createIconItem(item) {
     const displayName = lang === 'cn' ? (item.cn || item.name) : (item.en || item.name);
     iconItem.title = displayName;
     
-    // 存储组件信息
+    const inputs = extractInputs(item);
+    const outputs = extractOutputs(item);
+    
     iconItem.dataset.componentName = item.name;
+    iconItem.dataset.componentInputs = JSON.stringify(inputs);
+    iconItem.dataset.componentOutputs = JSON.stringify(outputs);
     iconItem.dataset.spriteX = item.spriteX || 0;
     iconItem.dataset.spriteY = item.spriteY || 0;
     iconItem.dataset.menuId = activeMenuId;
     
-    // 尝试从索引读取端口
-    let indexInputs = extractInputsFromIndex(item);
-    let indexOutputs = extractOutputsFromIndex(item);
-    
-    if (indexInputs !== null && indexOutputs !== null) {
-        iconItem.dataset.componentInputs = JSON.stringify(indexInputs);
-        iconItem.dataset.componentOutputs = JSON.stringify(indexOutputs);
-        iconItem.dataset.detailsLoaded = 'true';
-    } else {
-        iconItem.dataset.detailsLoaded = 'false';
-    }
-    
     const sprite = document.createElement('div');
     sprite.className = 'card-icon-sprite';
-    // 注意：雪碧图背景在 CSS 中设置，但坐标需要动态设置
     sprite.style.backgroundPosition = `-${item.spriteX || 0}px -${item.spriteY || 0}px`;
     
     const nameSpan = document.createElement('div');
@@ -424,48 +283,21 @@ function createIconItem(item) {
     iconItem.appendChild(sprite);
     iconItem.appendChild(nameSpan);
     
-    // 拖拽开始 - 异步加载详情
-    iconItem.addEventListener('dragstart', async (e) => {
-        e.dataTransfer.setData('text/plain', JSON.stringify({ 
-            name: item.name,
-            menuId: activeMenuId 
-        }));
-        e.dataTransfer.effectAllowed = 'copy';
-        iconItem.style.opacity = '0.5';
-        
-        console.log(`🚀 拖拽开始: ${item.name} (${activeMenuId})`);
-        
-        let inputs = [];
-        let outputs = [];
-        
-        if (iconItem.dataset.detailsLoaded === 'false') {
-            console.log(`📥 正在加载 ${item.name} 的端口详情...`);
-            const details = await loadComponentDetails(activeMenuId, item.name);
-            inputs = details.inputs;
-            outputs = details.outputs;
-            
-            iconItem.dataset.componentInputs = JSON.stringify(inputs);
-            iconItem.dataset.componentOutputs = JSON.stringify(outputs);
-            iconItem.dataset.detailsLoaded = 'true';
-        } else {
-            inputs = JSON.parse(iconItem.dataset.componentInputs || '[]');
-            outputs = JSON.parse(iconItem.dataset.componentOutputs || '[]');
-        }
-        
+    iconItem.addEventListener('dragstart', (e) => {
         const componentData = {
             name: item.name,
             inputs: inputs,
             outputs: outputs,
-            spriteX: parseInt(iconItem.dataset.spriteX) || 0,
-            spriteY: parseInt(iconItem.dataset.spriteY) || 0,
+            spriteX: item.spriteX || 0,
+            spriteY: item.spriteY || 0,
             menuId: activeMenuId
         };
-        
         dragData = componentData;
         window.dragData = componentData;
-        
-        console.log(`   输入端口:`, componentData.inputs);
-        console.log(`   输出端口:`, componentData.outputs);
+        e.dataTransfer.setData('text/plain', JSON.stringify(componentData));
+        e.dataTransfer.effectAllowed = 'copy';
+        iconItem.style.opacity = '0.5';
+        console.log(`🚀 拖拽: ${componentData.name}, 输入:${inputs.length}, 输出:${outputs.length}`);
     });
     
     iconItem.addEventListener('dragend', (e) => {
@@ -477,6 +309,7 @@ function createIconItem(item) {
     return iconItem;
 }
 
+// ========== 画布放置 ==========
 function setupCanvasDrop() {
     const canvasContainer = document.querySelector('.canvas-container');
     if (!canvasContainer) return;
@@ -486,39 +319,18 @@ function setupCanvasDrop() {
         e.dataTransfer.dropEffect = 'copy';
     });
     
-    canvasContainer.addEventListener('drop', async (e) => {
+    canvasContainer.addEventListener('drop', (e) => {
         e.preventDefault();
         
         let componentData = null;
         
-        // 从全局变量获取
-        if (window.dragData) {
-            componentData = window.dragData;
-        }
-        if (!componentData && dragData) {
-            componentData = dragData;
-        }
+        try {
+            const jsonData = e.dataTransfer.getData('text/plain');
+            if (jsonData) componentData = JSON.parse(jsonData);
+        } catch (err) {}
         
-        // 尝试从 dataTransfer 获取
-        if (!componentData) {
-            try {
-                const jsonData = e.dataTransfer.getData('text/plain');
-                if (jsonData) {
-                    const parsed = JSON.parse(jsonData);
-                    if (parsed.name && parsed.menuId) {
-                        const details = await loadComponentDetails(parsed.menuId, parsed.name);
-                        componentData = {
-                            name: parsed.name,
-                            inputs: details.inputs,
-                            outputs: details.outputs,
-                            spriteX: 0,
-                            spriteY: 0,
-                            menuId: parsed.menuId
-                        };
-                    }
-                }
-            } catch (err) {}
-        }
+        if (!componentData && window.dragData) componentData = window.dragData;
+        if (!componentData && dragData) componentData = dragData;
         
         if (!componentData) {
             console.warn('❌ 没有拖拽数据');
@@ -526,8 +338,6 @@ function setupCanvasDrop() {
         }
         
         console.log(`📍 放置电池: ${componentData.name}`);
-        console.log(`   输入端口:`, componentData.inputs);
-        console.log(`   输出端口:`, componentData.outputs);
         
         const rect = document.getElementById('canvas').getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
@@ -547,7 +357,7 @@ function setupCanvasDrop() {
         
         newComponent.spriteX = componentData.spriteX;
         newComponent.spriteY = componentData.spriteY;
-        newComponent.menuId = componentData.menuId;
+        newComponent.menuId = componentData.menuId || activeMenuId;
         newComponent.color = getComponentColorByName(componentData.name);
         
         canvasManager.addComponent(newComponent);
@@ -555,7 +365,7 @@ function setupCanvasDrop() {
     });
 }
 
-// ========== 其他函数（setupLanguage, setupLibrarySearch 等保持不变）==========
+// ========== 语言切换 ==========
 function setupLanguage() {
     const langBtn = document.getElementById('langBtn');
     if (langBtn) {
@@ -568,6 +378,7 @@ function setupLanguage() {
     }
 }
 
+// ========== 搜索功能 ==========
 function setupLibrarySearch() {
     const searchInput = document.getElementById('librarySearch');
     if (!searchInput) return;
@@ -590,6 +401,7 @@ function setupLibrarySearch() {
     });
 }
 
+// ========== 自定义电池 ==========
 function setupCustomComponent() {
     const addBtn = document.getElementById('addCustomComponent');
     if (addBtn) {
@@ -615,6 +427,7 @@ function setupCustomComponent() {
     }
 }
 
+// ========== 导入导出 ==========
 function setupImportExport() {
     const exportBtn = document.getElementById('exportJson');
     const importBtn = document.getElementById('importJson');
@@ -656,6 +469,7 @@ function setupImportExport() {
     }
 }
 
+// ========== 清空画布 ==========
 function setupClearCanvas() {
     const clearBtn = document.getElementById('clearCanvas');
     if (clearBtn) {
@@ -663,6 +477,7 @@ function setupClearCanvas() {
     }
 }
 
+// ========== 适应画布 ==========
 function setupZoomFit() {
     const zoomFitBtn = document.getElementById('zoomFit');
     if (zoomFitBtn) {
@@ -670,6 +485,7 @@ function setupZoomFit() {
     }
 }
 
+// ========== 撤销重做 ==========
 function setupUndoRedo() {
     const undoBtn = document.getElementById('undoBtn');
     const redoBtn = document.getElementById('redoBtn');
@@ -688,6 +504,7 @@ function setupUndoRedo() {
     }
 }
 
+// ========== 键盘快捷键 ==========
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -713,6 +530,7 @@ function setupKeyboardShortcuts() {
     });
 }
 
+// ========== 帮助模态框 ==========
 function setupHelpModal() {
     const showHelpBtn = document.getElementById('showHelp');
     const helpModal = document.getElementById('helpModal');
@@ -735,7 +553,7 @@ function setupHelpModal() {
     }
 }
 
-// 初始化
+// ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 初始化 Kangaroo2 电池编辑器...');
     
