@@ -52,7 +52,7 @@ const MENU_CONFIG = {
         dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/params.json',
         spriteUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/params_icons.png',
         detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/params/',
-        groupOrder: ['Primitive', 'Input', 'Output', 'File', 'Annotation', 'Model', 'Special', 'Get'],
+        groupOrder: ['Geometry', 'Primitive', 'Input', 'Rhino', 'Util'],
         groupNames: {
             'Geometry': '几何体',
             'Primitive': '基本类型',
