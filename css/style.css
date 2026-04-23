@@ -274,7 +274,8 @@ body {
     width: 24px;
     height: 24px;
     margin: 0 auto 6px;
-    background-image: url('https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png');
+    /* 删除这一行，不再使用 CSS 固定背景 */
+    /* background-image: url('...'); */
     background-repeat: no-repeat;
     background-size: 240px 264px;
     display: block;
