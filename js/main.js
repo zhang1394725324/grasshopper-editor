@@ -319,6 +319,13 @@ function createIconItem(item) {
     
     const sprite = document.createElement('div');
     sprite.className = 'card-icon-sprite';
+    
+    // 根据当前菜单动态设置雪碧图背景
+    const config = MENU_CONFIG[activeMenuId];
+    if (config && config.spriteUrl) {
+        sprite.style.backgroundImage = `url('${config.spriteUrl}')`;
+        sprite.style.backgroundSize = '240px 288px'; // 根据实际雪碧图尺寸调整
+    }
     sprite.style.backgroundPosition = `-${item.spriteX || 0}px -${item.spriteY || 0}px`;
     
     const nameSpan = document.createElement('div');
