@@ -54,24 +54,19 @@ const MENU_CONFIG = {
         detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/params/',
         groupOrder: ['Primitive', 'Input', 'Output', 'File', 'Annotation', 'Model', 'Special', 'Get'],
         groupNames: {
+            'Geometry': '几何体',
             'Primitive': '基本类型',
             'Input': '输入组件',
-            'Output': '输出组件',
-            'File': '文件操作',
-            'Annotation': '标注工具',
-            'Model': '模型对象',
-            'Special': '特殊工具',
-            'Get': '获取器'
+            'Rhino': '犀牛',
+            'Util': '工具',
         },
         groupNamesEn: {
+            'Geometry': 'Geometry',
             'Primitive': 'Primitive',
             'Input': 'Input',
-            'Output': 'Output',
-            'File': 'File',
-            'Annotation': 'Annotation',
-            'Model': 'Model',
-            'Special': 'Special',
-            'Get': 'Getter'
+            'Rhino': 'Rhino',
+            'Util': 'Util',
+
         }
     }
 };
