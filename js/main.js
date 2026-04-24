@@ -8,16 +8,16 @@ let detailsCache = {};
 // 菜单配置
 const MENU_CONFIG = {
     kangaroo: {
-        id: 'kangaroo',
-        nameCn: '🦘 Kangaroo2',
-        nameEn: '🦘 Kangaroo2',
-        icon: 'fa-puzzle-piece',
-        dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json',
-        spriteUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png',
-        spriteSize: { width: 240, height: 264 },  // ← 添加雪碧图尺寸
-        detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/kangaroo2/',
+        id: 'kangaroo',   // 唯一ID
+        nameCn: '🦘 Kangaroo2',   // 中文显示名
+        nameEn: '🦘 Kangaroo2',    // 英文显示名
+        icon: 'fa-puzzle-piece',   // Font Awesome 图标
+        dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json', // 数据文件URL
+        spriteUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png',     // 雪碧图URL
+        spriteSize: { width: 240, height: 264 },   // 雪碧图尺寸（宽x高）
+        detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/kangaroo2/', // 详情文件目录
         groupOrder: ['Goals-6dof', 'Goals-Angle', 'Goals-Co', 'Goals-Col', 'Goals-Lin',
-                     'Goals-Mesh', 'Goals-On', 'Goals-Pt', 'Main', 'Mesh', 'Utility'],
+                     'Goals-Mesh', 'Goals-On', 'Goals-Pt', 'Main', 'Mesh', 'Utility'],     // 分组顺序（与JSON中的key对应）
         groupNames: {
             'Goals-6dof': '六自由度约束',
             'Goals-Angle': '角度约束',
@@ -30,7 +30,7 @@ const MENU_CONFIG = {
             'Main': '求解器与核心',
             'Mesh': '网格工具',
             'Utility': '实用工具'
-        },
+        },        // 中文分组名
         groupNamesEn: {
             'Goals-6dof': '6-DOF Constraints',
             'Goals-Angle': 'Angle Constraints',
@@ -43,7 +43,7 @@ const MENU_CONFIG = {
             'Main': 'Solver & Core',
             'Mesh': 'Mesh Tools',
             'Utility': 'Utility'
-        }
+        }        // 英文分组名
     },
     params: {
         id: 'params',
