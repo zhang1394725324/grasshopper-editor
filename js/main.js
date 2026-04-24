@@ -14,6 +14,7 @@ const MENU_CONFIG = {
         icon: 'fa-puzzle-piece',
         dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/kangaroo.json',
         spriteUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/kangaroo_icons.png',
+        spriteSize: { width: 240, height: 264 },  // ← 添加雪碧图尺寸
         detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/kangaroo2/',
         groupOrder: ['Goals-6dof', 'Goals-Angle', 'Goals-Co', 'Goals-Col', 'Goals-Lin',
                      'Goals-Mesh', 'Goals-On', 'Goals-Pt', 'Main', 'Mesh', 'Utility'],
@@ -51,6 +52,7 @@ const MENU_CONFIG = {
         icon: 'fa-sliders-h',
         dataUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/params.json',
         spriteUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/img/sprites/params_icons.png',
+        spriteSize: { width: 240, height: 288 },  // ← 添加雪碧图尺寸
         detailsBaseUrl: 'https://raw.githubusercontent.com/zhang1394725324/Rhino-gh-kangaroo-docs/main/data/details/params/',
         groupOrder: ['Geometry', 'Primitive', 'Input', 'Rhino', 'Util'],
         groupNames: {
@@ -319,12 +321,13 @@ function createIconItem(item) {
     if (config && config.spriteUrl) {
         sprite.style.backgroundImage = `url('${config.spriteUrl}')`;
         
-        // 根据菜单设置不同的雪碧图尺寸
-        let bgSize = '240px 264px';  // Kangaroo2 默认
-        if (activeMenuId === 'params') {
-            bgSize = '240px 288px';   // Params
+        // 自动从配置中读取雪碧图尺寸
+        if (config.spriteSize) {
+            sprite.style.backgroundSize = `${config.spriteSize.width}px ${config.spriteSize.height}px`;
+        } else {
+            // 默认尺寸（兼容旧配置）
+            sprite.style.backgroundSize = '240px 264px';
         }
-        sprite.style.backgroundSize = bgSize;
     }
     sprite.style.backgroundPosition = `-${item.spriteX || 0}px -${item.spriteY || 0}px`;
     sprite.style.backgroundRepeat = 'no-repeat';
@@ -350,6 +353,8 @@ function createIconItem(item) {
         e.dataTransfer.effectAllowed = 'copy';
         iconItem.style.opacity = '0.5';
         
+        console.log(`📥 拖拽开始，加载 ${activeMenuId}/${item.name} 的端口数据...`);
+        
         const details = await loadComponentDetails(activeMenuId, item.name);
         
         const componentData = {
@@ -363,6 +368,8 @@ function createIconItem(item) {
         
         dragData = componentData;
         window.dragData = componentData;
+        
+        console.log(`🚀 拖拽: ${componentData.name}, 输入:${details.inputs.length}, 输出:${details.outputs.length}`);
     });
     
     iconItem.addEventListener('dragend', (e) => {
