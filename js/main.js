@@ -315,13 +315,19 @@ function createIconItem(item) {
     const sprite = document.createElement('div');
     sprite.className = 'card-icon-sprite';
     
-    // 根据当前菜单动态设置雪碧图背景
     const config = MENU_CONFIG[activeMenuId];
     if (config && config.spriteUrl) {
         sprite.style.backgroundImage = `url('${config.spriteUrl}')`;
-        sprite.style.backgroundSize = '240px 288px'; // 根据实际雪碧图尺寸调整
+        
+        // 根据菜单设置不同的雪碧图尺寸
+        let bgSize = '240px 264px';  // Kangaroo2 默认
+        if (activeMenuId === 'params') {
+            bgSize = '240px 288px';   // Params
+        }
+        sprite.style.backgroundSize = bgSize;
     }
     sprite.style.backgroundPosition = `-${item.spriteX || 0}px -${item.spriteY || 0}px`;
+    sprite.style.backgroundRepeat = 'no-repeat';
     
     const nameSpan = document.createElement('div');
     nameSpan.className = 'card-icon-name';
@@ -335,7 +341,7 @@ function createIconItem(item) {
     iconItem.appendChild(sprite);
     iconItem.appendChild(nameSpan);
     
-    // 拖拽事件 - 从 details 文件夹加载端口
+    // 拖拽事件
     iconItem.addEventListener('dragstart', async (e) => {
         e.dataTransfer.setData('text/plain', JSON.stringify({ 
             name: item.name, 
@@ -344,9 +350,6 @@ function createIconItem(item) {
         e.dataTransfer.effectAllowed = 'copy';
         iconItem.style.opacity = '0.5';
         
-        console.log(`📥 拖拽开始，加载 ${activeMenuId}/${item.name} 的端口数据...`);
-        
-        // 从 details 文件夹加载端口
         const details = await loadComponentDetails(activeMenuId, item.name);
         
         const componentData = {
@@ -360,8 +363,6 @@ function createIconItem(item) {
         
         dragData = componentData;
         window.dragData = componentData;
-        
-        console.log(`🚀 拖拽: ${componentData.name}, 输入:${details.inputs.length}, 输出:${details.outputs.length}`);
     });
     
     iconItem.addEventListener('dragend', (e) => {
